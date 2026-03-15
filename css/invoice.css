@@ -1,0 +1,312 @@
+/* ============================================================
+   Invoice Generator — Styles
+   Light theme (default) + dark mode + print + responsive
+   ============================================================ */
+
+* { box-sizing: border-box; }
+
+/* --- CSS Custom Properties (Light Theme) --- */
+:root {
+  --bg: #ffffff;
+  --text: #000000;
+  --input-bg: #ffffff;
+  --border: #ccc;
+  --head-bg: #f2f2f2;
+  --btn-bg: #ffffff;
+  --btn-hover: #f0f0f0;
+  --card-bg: #ffffff;
+  --history-bg: #f9f9f9;
+  --history-hover: #eee;
+  --del-color: #666;
+}
+
+/* --- Dark Theme --- */
+[data-theme="dark"] {
+  --bg: #1a1a1a;
+  --text: #e0e0e0;
+  --input-bg: #2a2a2a;
+  --border: #444;
+  --head-bg: #333;
+  --btn-bg: #2a2a2a;
+  --btn-hover: #3a3a3a;
+  --card-bg: #222;
+  --history-bg: #252525;
+  --history-hover: #333;
+  --del-color: #999;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--bg);
+}
+
+/* --- Header Bar --- */
+.bar {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: 980px;
+  margin: 0 auto;
+}
+.toolbar strong { font-size: 14px; }
+.actions, .picker {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.btn {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  background: var(--btn-bg);
+  color: var(--text);
+  font-size: 11px;
+  cursor: pointer;
+}
+.btn:hover { background: var(--btn-hover); }
+#productSelect {
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  background: var(--input-bg);
+  color: var(--text);
+  font-size: 11px;
+}
+
+/* --- Main Invoice Sheet --- */
+.stage { padding: 8px; }
+.invoice-wrap { max-width: 980px; margin: 0 auto; }
+h1 {
+  font-size: 16px;
+  margin: 0 0 8px;
+  text-transform: uppercase;
+}
+
+/* --- Meta Fields --- */
+.meta {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px 8px;
+  margin-bottom: 8px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  font-size: 11px;
+}
+.field .label { margin-bottom: 2px; }
+.field input {
+  border: 1px solid var(--border);
+  background: var(--input-bg);
+  color: var(--text);
+  padding: 2px 4px;
+  height: 20px;
+  font-size: 11px;
+}
+
+/* --- Addresses --- */
+.addresses {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 12px;
+  margin: 8px 0;
+}
+.addr h3 {
+  margin: 0 0 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+.addr textarea {
+  width: 100%;
+  height: 70px;
+  border: 1px solid var(--border);
+  background: var(--input-bg);
+  color: var(--text);
+  font-size: 11px;
+  padding: 4px;
+  resize: vertical;
+}
+
+/* --- Items Grid --- */
+.itemsWrap {
+  margin-top: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.items { min-width: 780px; }
+.gridCols {
+  display: grid;
+  grid-template-columns: 32px 45px minmax(260px, 1fr) 110px 80px 90px 50px;
+  gap: 0;
+}
+.head {
+  font-weight: bold;
+  background: var(--head-bg);
+  padding: 4px;
+  font-size: 11px;
+}
+.row {
+  padding: 2px 4px;
+  font-size: 11px;
+}
+.cell { min-width: 0; }
+.rowIndex {
+  display: inline-block;
+  width: 100%;
+  text-align: center;
+}
+.cell input {
+  width: 100%;
+  border: none;
+  background: var(--input-bg);
+  color: var(--text);
+  padding: 1px 3px;
+  font-size: 11px;
+  height: 18px;
+}
+.cell input.qty { text-align: center; }
+.cell input.unit { text-align: right; }
+.cell input.hs { text-align: left; }
+.lineTotal {
+  display: block;
+  padding: 1px 3px;
+  font-size: 11px;
+  height: 18px;
+  text-align: right;
+}
+.del {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--del-color);
+  font-size: 11px;
+  padding: 0;
+  height: 18px;
+  cursor: pointer;
+}
+
+.controls {
+  margin-top: 6px;
+  display: flex;
+  gap: 4px;
+}
+
+/* --- Totals --- */
+.totals {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+.totalCard {
+  padding: 6px 8px;
+  min-width: 260px;
+  font-size: 11px;
+}
+.totalRow {
+  display: flex;
+  justify-content: space-between;
+  margin: 2px 0;
+}
+
+/* --- History Panel --- */
+.history-wrap {
+  position: relative;
+  display: inline-block;
+}
+.history-panel {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  width: 300px;
+  max-height: 400px;
+  overflow-y: auto;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  z-index: 100;
+  font-size: 11px;
+}
+.history-panel.open { display: block; }
+.history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+}
+.history-item:hover { background: var(--history-hover); }
+.history-item-info { flex: 1; }
+.history-item-label { font-weight: bold; }
+.history-item-date { color: var(--del-color); font-size: 10px; }
+.history-item-del {
+  border: none;
+  background: transparent;
+  color: var(--del-color);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 4px;
+}
+.history-empty {
+  padding: 12px 8px;
+  color: var(--del-color);
+  text-align: center;
+}
+
+/* --- Responsive --- */
+@media (max-width: 480px) {
+  .meta { grid-template-columns: 1fr 1fr; }
+  .addresses { grid-template-columns: 1fr; }
+  .addr textarea { height: 90px; }
+  .gridCols {
+    grid-template-columns: 32px 42px minmax(160px, 1fr) 90px 70px 80px 44px;
+  }
+}
+
+/* --- Print: always light, hide chrome --- */
+.print-only { display: none; }
+
+@media print {
+  @page { size: A4 portrait; margin: 15mm; }
+
+  /* Force light theme for print */
+  html, body {
+    padding: 0;
+    background: #fff !important;
+    color: #000 !important;
+  }
+  * {
+    color: #000 !important;
+    background: transparent !important;
+  }
+
+  .bar, .controls, .history-wrap { display: none !important; }
+  .invoice-wrap { max-width: none; }
+  .itemsWrap { display: none; }
+  .print-only {
+    display: table;
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .print-only th, .print-only td {
+    border: none !important;
+    padding: 3px 4px;
+    font-size: 11px;
+    text-align: left;
+  }
+  thead { display: table-header-group; }
+
+  .field input, .addr textarea {
+    border: none !important;
+    background: transparent !important;
+  }
+}

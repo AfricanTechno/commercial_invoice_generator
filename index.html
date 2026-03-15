@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Commercial Invoice</title>
+  <link rel="stylesheet" href="css/invoice.css" />
+</head>
+<body>
+
+  <!-- Toolbar -->
+  <div class="bar">
+    <div class="toolbar">
+      <strong>Invoice</strong>
+      <div class="actions">
+        <button class="btn" id="themeToggle" onclick="toggleTheme()">Dark</button>
+        <button class="btn" onclick="printInvoice()">Print</button>
+        <button class="btn" onclick="newInvoice()">New Invoice</button>
+        <button class="btn" onclick="exportCSV()">Export CSV</button>
+        <button class="btn" onclick="exportJSON()">Export JSON</button>
+        <div class="history-wrap">
+          <button class="btn" onclick="toggleHistoryPanel()">History</button>
+          <div class="history-panel" id="historyPanel"></div>
+        </div>
+      </div>
+      <div class="picker">
+        <select id="productSelect">
+          <option value="">+ Add product...</option>
+        </select>
+        <button class="btn" onclick="addProduct()">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Invoice -->
+  <main class="stage">
+    <div class="invoice-wrap">
+      <h1>Commercial Invoice</h1>
+
+      <!-- Meta Fields -->
+      <div class="meta">
+        <label class="field"><span class="label">Invoice No.</span><input id="invoiceNumber" /></label>
+        <label class="field"><span class="label">Date (DD-MM-YYYY)</span><input id="invoiceDate" /></label>
+        <label class="field"><span class="label">Air Waybill #</span><input id="waybill" /></label>
+        <label class="field"><span class="label">Currency</span><input id="currency" value="USD" /></label>
+      </div>
+
+      <!-- Addresses -->
+      <div class="addresses">
+        <div class="addr">
+          <h3>Shipper / Exporter</h3>
+          <textarea id="shipper"></textarea>
+        </div>
+        <div class="addr">
+          <h3>Sold To</h3>
+          <textarea id="soldto"></textarea>
+        </div>
+      </div>
+
+      <!-- Line Items -->
+      <div class="itemsWrap">
+        <div class="items" id="items">
+          <div class="head gridCols">
+            <div>#</div><div>Qty</div><div>Description</div><div>HS Code</div><div>Unit</div><div>Line Total</div><div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button class="btn" onclick="addBlankRow()">Add Row</button>
+      </div>
+
+      <!-- Totals -->
+      <div class="totals">
+        <div class="totalCard">
+          <div class="totalRow">
+            <span>Total (<span id="currencyLabel">USD</span>)</span>
+            <strong id="grandTotal">0.00</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- Print-only table -->
+      <table class="print-only" id="printTable"></table>
+    </div>
+  </main>
+
+  <script src="js/catalogue.js"></script>
+  <script src="js/invoice.js"></script>
+</body>
+</html>
