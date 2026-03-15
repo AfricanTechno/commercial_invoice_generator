@@ -1,36 +1,42 @@
-# Invoice App
+# Commercial Invoice Generator
 
-A secure web application for creating, editing, and printing **A4-ready commercial invoices**.  
-Built with **React (Vite)**, **Supabase** for authentication and data storage, and deployed on **Vercel**.
-
-—
+A lightweight web app for creating, editing, and printing A4-ready commercial invoices. No frameworks, no build tools — just open `index.html` in a browser.
 
 ## Features
-- **User authentication** (Supabase Auth: email magic link or password).
-- **Address book** with saved contacts (Shipper / Sold To).
-- **Invoice editor** with:
-  - Add/remove products from a predefined list.
-  - Auto-calculated line totals and invoice total.
-  - Sticky headers and scrollable product table (mobile-friendly).
-- **A4 print mode**: one-click print to PDF with repeating table headers.
 
-—
+- **Product catalogue** with 40+ items organised in grouped categories (Eyewear, VR/Gaming, Cameras, etc.) with HS tariff codes and SKUs
+- **Auto-calculated totals** — line totals and grand total update as you type
+- **Dark mode** toggle (print always stays black-on-white)
+- **Invoice history** — automatically saves invoices when you create a new one; load or delete past invoices (up to 50)
+- **Export** to CSV or JSON
+- **Print-ready** A4 layout with clean table output via Cmd/Ctrl+P
+- **LocalStorage persistence** — your current invoice survives browser refreshes
+- **Responsive** layout for smaller screens
 
-## Tech Stack
-- **Frontend**: React + Vite
-- **Backend / DB**: Supabase (Postgres + Row Level Security)
-- **Deployment**: Vercel
-- **Auth**: Supabase (magic link)
+## Usage
 
-—
+Open `index.html` directly in any modern browser, or serve it locally:
 
-## Getting Started
-
-### Prerequisites
-- Node.js 18+
-- A Supabase project with the SQL schema applied (see `/supabase/schema.sql`).
-
-### Install & Run
 ```bash
-npm install
-npm run dev
+python3 -m http.server 8080
+```
+
+Then visit `http://localhost:8080`.
+
+## File Structure
+
+```
+index.html            # HTML shell — toolbar, meta fields, addresses, items grid
+css/
+  invoice.css         # All styles: light/dark themes, print, responsive
+js/
+  catalogue.js        # Product data + category groupings (edit here to add products)
+  invoice.js          # Application logic: state, history, export, calculations
+```
+
+## Adding Products
+
+Edit `js/catalogue.js`:
+
+1. Add an entry to the `CATALOGUE` object with `hs`, `unit` (price), and `sku` fields
+2. Add the product name to the appropriate category in `CATALOGUE_GROUPS`
