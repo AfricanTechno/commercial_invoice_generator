@@ -37,31 +37,110 @@
     <div class="invoice-wrap">
       <h1>Commercial Invoice</h1>
 
-      <!-- Meta Fields -->
+      <!-- 1. Shipping Reference -->
       <div class="meta">
         <label class="field"><span class="label">Invoice No.</span><input id="invoiceNumber" /></label>
         <label class="field"><span class="label">Date (DD-MM-YYYY)</span><input id="invoiceDate" /></label>
         <label class="field"><span class="label">Air Waybill #</span><input id="waybill" /></label>
         <label class="field"><span class="label">Currency</span><input id="currency" value="USD" /></label>
+        <label class="field"><span class="label">Shipment Ref</span><input id="shipmentRef" /></label>
+        <label class="field">
+          <span class="label">Incoterms</span>
+          <select id="incoterms">
+            <option value="DAP">DAP</option>
+            <option value="DDP">DDP</option>
+            <option value="EXW">EXW</option>
+            <option value="FCA">FCA</option>
+            <option value="FOB">FOB</option>
+            <option value="CIF">CIF</option>
+            <option value="CPT">CPT</option>
+            <option value="CIP">CIP</option>
+          </select>
+        </label>
+        <label class="field">
+          <span class="label">Reason for Export</span>
+          <select id="reasonForExport">
+            <option value="Sale">Sale</option>
+            <option value="Gift">Gift</option>
+            <option value="Sample">Sample</option>
+            <option value="Repair/Return">Repair / Return</option>
+            <option value="Personal Effects">Personal Effects</option>
+            <option value="Temporary Import">Temporary Import</option>
+            <option value="Other">Other</option>
+          </select>
+        </label>
       </div>
 
-      <!-- Addresses -->
-      <div class="addresses">
-        <div class="addr">
+      <!-- 2. Parties -->
+      <div class="parties">
+        <div class="party">
           <h3>Shipper / Exporter</h3>
-          <textarea id="shipper"></textarea>
+          <label class="field"><span class="label">Company / Name</span><input id="shipperName" /></label>
+          <label class="field"><span class="label">Address</span><textarea id="shipperAddr"></textarea></label>
+          <div class="party-row">
+            <label class="field"><span class="label">Phone</span><input id="shipperPhone" /></label>
+            <label class="field"><span class="label">Email</span><input id="shipperEmail" /></label>
+          </div>
+          <label class="field"><span class="label">Tax / VAT ID</span><input id="shipperTaxId" /></label>
         </div>
-        <div class="addr">
-          <h3>Sold To</h3>
-          <textarea id="soldto"></textarea>
+
+        <div class="party">
+          <h3>Consignee / Receiver</h3>
+          <label class="field"><span class="label">Company / Name</span><input id="consigneeName" /></label>
+          <label class="field"><span class="label">Address</span><textarea id="consigneeAddr"></textarea></label>
+          <div class="party-row">
+            <label class="field"><span class="label">Phone</span><input id="consigneePhone" /></label>
+            <label class="field"><span class="label">Email</span><input id="consigneeEmail" /></label>
+          </div>
+          <label class="field"><span class="label">Tax / VAT ID</span><input id="consigneeTaxId" /></label>
+        </div>
+
+        <div class="party importer-party">
+          <h3>
+            Importer of Record
+            <label class="same-check"><input type="checkbox" id="importerSameAsConsignee" onclick="toggleImporterSame()" /> Same as Consignee</label>
+          </h3>
+          <label class="field"><span class="label">Company / Name</span><input id="importerName" /></label>
+          <label class="field"><span class="label">Address</span><textarea id="importerAddr"></textarea></label>
+          <div class="party-row">
+            <label class="field"><span class="label">Phone</span><input id="importerPhone" /></label>
+            <label class="field"><span class="label">Email</span><input id="importerEmail" /></label>
+          </div>
+          <label class="field"><span class="label">Tax / VAT ID</span><input id="importerTaxId" /></label>
         </div>
       </div>
 
-      <!-- Line Items -->
+      <!-- 3. Shipment Details -->
+      <div class="shipment-details">
+        <label class="field"><span class="label">Default Origin</span><input id="defaultOrigin" value="US" /></label>
+        <label class="field"><span class="label">Total Weight (kg)</span><input id="totalWeight" value="0.00" readonly /></label>
+        <label class="field"><span class="label">No. of Packages</span><input id="numPackages" value="1" inputmode="numeric" /></label>
+        <label class="field">
+          <span class="label">Shipping Method</span>
+          <select id="shippingMethod">
+            <option value="Express">Express</option>
+            <option value="Economy">Economy</option>
+            <option value="Standard">Standard</option>
+            <option value="Freight">Freight</option>
+          </select>
+        </label>
+        <label class="field">
+          <span class="label">Carrier</span>
+          <select id="carrier">
+            <option value="DHL">DHL</option>
+            <option value="FedEx">FedEx</option>
+            <option value="UPS">UPS</option>
+            <option value="Aramex">Aramex</option>
+            <option value="Other">Other</option>
+          </select>
+        </label>
+      </div>
+
+      <!-- 4. Goods Description Table -->
       <div class="itemsWrap">
         <div class="items" id="items">
           <div class="head gridCols">
-            <div>#</div><div>Qty</div><div>Description</div><div>HS Code</div><div>Unit</div><div>Line Total</div><div></div>
+            <div>#</div><div>Qty</div><div>Description</div><div>HS Code</div><div>UoM</div><div>Unit Price</div><div>CoO</div><div>Wt (kg)</div><div>Total</div><div></div>
           </div>
         </div>
       </div>
@@ -70,18 +149,42 @@
         <button class="btn" onclick="addBlankRow()">Add Row</button>
       </div>
 
-      <!-- Totals -->
+      <!-- 5. Shipment Summary -->
       <div class="totals">
         <div class="totalCard">
           <div class="totalRow">
-            <span>Total (<span id="currencyLabel">USD</span>)</span>
+            <span>Subtotal</span>
+            <span id="subtotal">0.00</span>
+          </div>
+          <div class="totalRow">
+            <span>Shipping Cost</span>
+            <input id="shippingCost" value="0.00" inputmode="decimal" />
+          </div>
+          <div class="totalRow">
+            <span>Insurance</span>
+            <input id="insurance" value="0.00" inputmode="decimal" />
+          </div>
+          <div class="totalRow grand">
+            <span>Grand Total (<span id="currencyLabel">USD</span>)</span>
             <strong id="grandTotal">0.00</strong>
           </div>
         </div>
       </div>
 
-      <!-- Print-only table -->
-      <table class="print-only" id="printTable"></table>
+      <!-- 6. Declaration -->
+      <div class="declaration">
+        <h3>Declaration</h3>
+        <p>I/We hereby declare that the information on this invoice is true and correct
+        and that the contents of this shipment are as stated above.</p>
+        <div class="declaration-fields">
+          <label class="field"><span class="label">Exporter Name</span><input id="declarantName" /></label>
+          <div class="field"><span class="label">Signature</span><div class="sig-line"></div></div>
+          <label class="field"><span class="label">Date</span><input id="declarantDate" /></label>
+        </div>
+      </div>
+
+      <!-- Print-only block -->
+      <div class="print-only" id="printBlock"></div>
     </div>
   </main>
 

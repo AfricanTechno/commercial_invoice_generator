@@ -1,18 +1,20 @@
 // ============================================================
 // Invoice Generator — Application Logic
+// DHL customs-compliant commercial invoice
 // ============================================================
 
 // --- A: DOM References & Constants ---
 const $  = (id) => document.getElementById(id);
 const $$ = (sel) => document.querySelectorAll(sel);
 
-const STORAGE_KEY   = 'invoice_v3';
+const STORAGE_KEY   = 'invoice_v4';
 const HISTORY_KEY   = 'invoice_history';
 const THEME_KEY     = 'invoice_theme';
 const MAX_HISTORY   = 50;
 
-// Legacy keys for migration
-const LEGACY_KEYS = ['invoice_pro_state_v2_no_vat', 'invoice_state'];
+const LEGACY_KEYS = ['invoice_v3', 'invoice_pro_state_v2_no_vat', 'invoice_state'];
+
+const UOM_OPTIONS = ['pcs', 'kg', 'set', 'pair', 'box', 'unit'];
 
 // --- B: Utilities ---
 function escapeHtml(s) {
@@ -30,6 +32,23 @@ function downloadFile(name, type, data) {
   a.download = name;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+}
+
+function todayStr() {
+  const d = new Date();
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return `${dd}-${mm}-${d.getFullYear()}`;
+}
+
+function val(id) { const el = $(id); return el ? el.value || '' : ''; }
+function setVal(id, v) { const el = $(id); if (el) el.value = v || ''; }
+function setSel(id, v) {
+  const el = $(id);
+  if (!el) return;
+  for (let i = 0; i < el.options.length; i++) {
+    if (el.options[i].value === v) { el.selectedIndex = i; return; }
+  }
 }
 
 // --- C: Theme ---
@@ -58,13 +77,11 @@ function loadTheme() {
 // --- D: Dropdown Population ---
 function populateProductDropdown() {
   const sel = $('productSelect');
-  // Remove everything except the placeholder
   while (sel.options.length > 1) sel.remove(1);
 
   CATALOGUE_GROUPS.forEach(group => {
     const og = document.createElement('optgroup');
     og.label = group.label;
-
     group.items.forEach(name => {
       if (!CATALOGUE.hasOwnProperty(name)) return;
       const o = document.createElement('option');
@@ -72,19 +89,22 @@ function populateProductDropdown() {
       o.textContent = name;
       og.appendChild(o);
     });
-
     if (og.children.length) sel.appendChild(og);
   });
 }
 
 // --- E: Row Management ---
 function rowToData(row) {
+  const uomEl = row.querySelector('.uom');
   return {
-    qty:  parseFloat(row.querySelector('.qty').value) || 0,
-    desc: (row.querySelector('.desc').value || '').trim(),
-    hs:   (row.querySelector('.hs').value || '').trim(),
-    unit: parseFloat(row.querySelector('.unit').value) || 0,
-    sku:  row.dataset.sku || ''
+    qty:    parseFloat(row.querySelector('.qty').value) || 0,
+    desc:   (row.querySelector('.desc').value || '').trim(),
+    hs:     (row.querySelector('.hs').value || '').trim(),
+    unit:   parseFloat(row.querySelector('.unit').value) || 0,
+    sku:    row.dataset.sku || '',
+    uom:    uomEl ? uomEl.value : 'pcs',
+    origin: (row.querySelector('.origin').value || '').trim().toUpperCase(),
+    weight: parseFloat(row.querySelector('.weight').value) || 0
   };
 }
 
@@ -95,19 +115,33 @@ function updateRowNumbers() {
   });
 }
 
-function addRow({ qty, desc, hs, unit, sku }) {
+function buildUomSelect(selected) {
+  const opts = UOM_OPTIONS.map(u =>
+    `<option value="${u}"${u === selected ? ' selected' : ''}>${u}</option>`
+  ).join('');
+  return `<select class="uom">${opts}</select>`;
+}
+
+function addRow({ qty, desc, hs, unit, sku, uom, origin, weight }) {
   const items = $('items');
   const row = document.createElement('div');
   row.className = 'row gridCols';
   row.setAttribute('data-row', '');
   if (sku) row.dataset.sku = sku;
 
+  const defOrigin = origin || val('defaultOrigin') || DEFAULT_ORIGIN;
+  const defUom = uom || 'pcs';
+  const defWeight = weight || 0;
+
   row.innerHTML = `
     <div class="cell"><span class="rowIndex"></span></div>
     <div class="cell"><input class="qty" value="${qty}" inputmode="numeric"/></div>
     <div class="cell"><input class="desc" value="${escapeHtml(desc)}"/></div>
     <div class="cell"><input class="hs" value="${escapeHtml(hs)}"/></div>
+    <div class="cell">${buildUomSelect(defUom)}</div>
     <div class="cell"><input class="unit" value="${fmt(unit)}" inputmode="decimal"/></div>
+    <div class="cell"><input class="origin" value="${escapeHtml(defOrigin)}" maxlength="2"/></div>
+    <div class="cell"><input class="weight" value="${fmt(defWeight)}" inputmode="decimal"/></div>
     <div class="cell"><span class="lineTotal">${fmt(qty * unit)}</span></div>
     <div class="cell"><button class="del" onclick="deleteRow(this)">Del</button></div>`;
 
@@ -117,7 +151,10 @@ function addRow({ qty, desc, hs, unit, sku }) {
 }
 
 function addBlankRow() {
-  addRow({ qty: 1, desc: 'New Product', hs: '0000.00.00', unit: 0, sku: '' });
+  addRow({
+    qty: 1, desc: 'New Product', hs: '0000.00.00', unit: 0, sku: '',
+    uom: 'pcs', origin: val('defaultOrigin') || DEFAULT_ORIGIN, weight: 0
+  });
 }
 
 function addProduct() {
@@ -127,7 +164,6 @@ function addProduct() {
   const p = CATALOGUE[key];
   if (!p) return;
 
-  // Check for existing row with same product
   const existing = [...$$('#items [data-row]')].find(r => {
     const d = rowToData(r);
     return d.desc === key && d.hs === p.hs && fmt(d.unit) === fmt(p.unit);
@@ -139,100 +175,217 @@ function addProduct() {
     recalcTotals();
     saveState();
   } else {
-    addRow({ qty: 1, desc: key, hs: p.hs, unit: p.unit, sku: p.sku || '' });
+    addRow({
+      qty: 1, desc: key, hs: p.hs, unit: p.unit, sku: p.sku || '',
+      uom: 'pcs', origin: p.origin || DEFAULT_ORIGIN, weight: p.weight || 0
+    });
   }
   sel.selectedIndex = 0;
 }
 
 function deleteRow(btn) {
-  btn.closest('[data-row]')?.remove();
+  const row = btn.closest('[data-row]');
+  if (row) row.remove();
   recalcTotals();
   saveState();
 }
 
 // --- F: Calculation ---
 function recalcTotals() {
-  let sum = 0;
+  let subtotal = 0;
+  let totalWeight = 0;
+
   $$('#items [data-row]').forEach(row => {
     const d = rowToData(row);
     const line = d.qty * d.unit;
     row.querySelector('.lineTotal').textContent = fmt(line);
-    sum += line;
+    subtotal += line;
+    totalWeight += d.qty * d.weight;
   });
   updateRowNumbers();
 
-  const currency = ($('currency').value || 'USD').toUpperCase();
+  const currency = (val('currency') || 'USD').toUpperCase();
   const label = $('currencyLabel');
   if (label) label.textContent = currency;
-  $('grandTotal').textContent = fmt(sum);
+
+  const shippingCost = parseFloat(val('shippingCost')) || 0;
+  const insurance = parseFloat(val('insurance')) || 0;
+  const grandTotal = subtotal + shippingCost + insurance;
+
+  const subtotalEl = $('subtotal');
+  if (subtotalEl) subtotalEl.textContent = fmt(subtotal);
+  $('grandTotal').textContent = fmt(grandTotal);
+
+  const weightEl = $('totalWeight');
+  if (weightEl) weightEl.value = fmt(totalWeight);
 }
 
 // --- G: Print ---
-function buildPrintTable() {
-  const tbl = $('printTable');
-  tbl.innerHTML = '';
-  const cur = ($('currency').value || 'USD').toUpperCase();
+function buildPrintBlock() {
+  const block = $('printBlock');
+  block.innerHTML = '';
+  const st = getState();
+  const cur = st.meta.currency || 'USD';
 
-  const thead = document.createElement('thead');
-  thead.innerHTML = `<tr>
-    <th style="width:6%">#</th>
-    <th style="width:8%">Qty</th>
-    <th>Description</th>
-    <th style="width:16%">HS Code</th>
-    <th style="width:16%">Unit (${escapeHtml(cur)})</th>
-    <th style="width:18%">Line Total</th>
-  </tr>`;
+  // Parties
+  let partiesHtml = '<div class="print-parties">';
+  partiesHtml += buildPrintParty('Shipper / Exporter', st.parties.shipper);
+  partiesHtml += buildPrintParty('Consignee / Receiver', st.parties.consignee);
+  partiesHtml += '</div>';
 
-  const tbody = document.createElement('tbody');
-  const rows = [...$$('#items [data-row]')];
+  if (st.parties.importer && st.parties.importer.name && !st.parties.importer.sameAsConsignee) {
+    partiesHtml += '<div class="print-parties">';
+    partiesHtml += buildPrintParty('Importer of Record', st.parties.importer);
+    partiesHtml += '</div>';
+  }
 
-  rows.forEach((row, idx) => {
-    const d = rowToData(row);
-    const line = d.qty * d.unit;
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
+  // Shipment details
+  const shipHtml = `<div class="print-shipment">
+    <strong>Origin:</strong> ${escapeHtml(st.shipment.defaultOrigin)}
+    &nbsp; <strong>Weight:</strong> ${st.shipment.totalWeight} kg
+    &nbsp; <strong>Packages:</strong> ${escapeHtml(st.shipment.numPackages)}
+    &nbsp; <strong>Method:</strong> ${escapeHtml(st.shipment.shippingMethod)}
+    &nbsp; <strong>Carrier:</strong> ${escapeHtml(st.shipment.carrier)}
+    &nbsp; <strong>Incoterms:</strong> ${escapeHtml(st.meta.incoterms)}
+    &nbsp; <strong>Reason:</strong> ${escapeHtml(st.meta.reasonForExport)}
+  </div>`;
+
+  // Items table
+  let tableHtml = `<table>
+    <thead><tr>
+      <th style="width:4%">#</th>
+      <th style="width:5%">Qty</th>
+      <th>Description</th>
+      <th style="width:10%">HS Code</th>
+      <th style="width:6%">UoM</th>
+      <th style="width:10%">Unit (${escapeHtml(cur)})</th>
+      <th style="width:5%">CoO</th>
+      <th style="width:7%">Wt (kg)</th>
+      <th style="width:11%">Total</th>
+    </tr></thead><tbody>`;
+
+  st.items.forEach((item, idx) => {
+    const line = item.qty * item.unit;
+    tableHtml += `<tr>
       <td style="text-align:right">${idx + 1}</td>
-      <td style="text-align:right">${d.qty}</td>
-      <td>${escapeHtml(d.desc)}</td>
-      <td>${escapeHtml(d.hs)}</td>
-      <td style="text-align:right">${fmt(d.unit)}</td>
-      <td style="text-align:right">${fmt(line)}</td>`;
-    tbody.appendChild(tr);
+      <td style="text-align:right">${item.qty}</td>
+      <td>${escapeHtml(item.desc)}</td>
+      <td>${escapeHtml(item.hs)}</td>
+      <td style="text-align:center">${escapeHtml(item.uom)}</td>
+      <td style="text-align:right">${fmt(item.unit)}</td>
+      <td style="text-align:center">${escapeHtml(item.origin)}</td>
+      <td style="text-align:right">${fmt(item.weight)}</td>
+      <td style="text-align:right">${fmt(line)}</td>
+    </tr>`;
   });
+  tableHtml += '</tbody></table>';
 
-  const grand = $('grandTotal').textContent || '0.00';
-  const trTotal = document.createElement('tr');
-  trTotal.innerHTML = `<td></td><td></td><td></td><td></td>
-    <td style="text-align:right;font-weight:700">Total</td>
-    <td style="text-align:right;font-weight:700">${escapeHtml(grand)}</td>`;
-  tbody.appendChild(trTotal);
+  // Summary
+  const summaryHtml = `<div class="print-summary">
+    <div class="line">Subtotal: ${escapeHtml(st.totals.subtotal)}</div>
+    ${parseFloat(st.totals.shippingCost) ? '<div class="line">Shipping: ' + escapeHtml(st.totals.shippingCost) + '</div>' : ''}
+    ${parseFloat(st.totals.insurance) ? '<div class="line">Insurance: ' + escapeHtml(st.totals.insurance) + '</div>' : ''}
+    <div class="line grand">Grand Total (${escapeHtml(cur)}): ${escapeHtml(st.totals.total)}</div>
+  </div>`;
 
-  tbl.appendChild(thead);
-  tbl.appendChild(tbody);
+  // Declaration
+  const declHtml = `<div class="print-declaration">
+    <p>I/We hereby declare that the information on this invoice is true and correct
+    and that the contents of this shipment are as stated above.</p>
+    <div class="print-sig-row">
+      <div>${escapeHtml(st.declaration.name || '')}<br>Name</div>
+      <div><br>Signature</div>
+      <div>${escapeHtml(st.declaration.date || '')}<br>Date</div>
+    </div>
+  </div>`;
+
+  block.innerHTML = partiesHtml + shipHtml + tableHtml + summaryHtml + declHtml;
+}
+
+function buildPrintParty(title, party) {
+  if (!party) return '';
+  let lines = `<div class="print-party"><h4>${escapeHtml(title)}</h4>`;
+  if (party.name) lines += `<p><strong>${escapeHtml(party.name)}</strong></p>`;
+  if (party.address) lines += `<p>${escapeHtml(party.address).replace(/\n/g, '<br>')}</p>`;
+  if (party.phone) lines += `<p>Tel: ${escapeHtml(party.phone)}</p>`;
+  if (party.email) lines += `<p>Email: ${escapeHtml(party.email)}</p>`;
+  if (party.taxId) lines += `<p>Tax/VAT: ${escapeHtml(party.taxId)}</p>`;
+  lines += '</div>';
+  return lines;
 }
 
 function printInvoice() {
-  buildPrintTable();
+  buildPrintBlock();
   window.print();
 }
 
-window.addEventListener('beforeprint', buildPrintTable);
+window.addEventListener('beforeprint', buildPrintBlock);
 
 // --- H: State Persistence ---
+function readPartyFields(prefix) {
+  return {
+    name:    val(prefix + 'Name'),
+    address: val(prefix + 'Addr'),
+    phone:   val(prefix + 'Phone'),
+    email:   val(prefix + 'Email'),
+    taxId:   val(prefix + 'TaxId')
+  };
+}
+
+function writePartyFields(prefix, party) {
+  if (!party) return;
+  // Handle legacy format (plain string)
+  if (typeof party === 'string') {
+    setVal(prefix + 'Addr', party);
+    return;
+  }
+  setVal(prefix + 'Name', party.name);
+  setVal(prefix + 'Addr', party.address);
+  setVal(prefix + 'Phone', party.phone);
+  setVal(prefix + 'Email', party.email);
+  setVal(prefix + 'TaxId', party.taxId);
+}
+
 function getState() {
   const items = [...$$('#items [data-row]')].map(row => rowToData(row));
+  const shippingCost = val('shippingCost') || '0.00';
+  const insurance = val('insurance') || '0.00';
+
   return {
     meta: {
-      invoice:  $('invoiceNumber').value || '',
-      date:     $('invoiceDate').value || '',
-      waybill:  $('waybill').value || '',
-      currency: ($('currency').value || 'USD').toUpperCase()
+      invoice:         val('invoiceNumber'),
+      date:            val('invoiceDate'),
+      waybill:         val('waybill'),
+      currency:        (val('currency') || 'USD').toUpperCase(),
+      shipmentRef:     val('shipmentRef'),
+      incoterms:       val('incoterms'),
+      reasonForExport: val('reasonForExport')
+    },
+    parties: {
+      shipper:   readPartyFields('shipper'),
+      consignee: readPartyFields('consignee'),
+      importer:  {
+        ...readPartyFields('importer'),
+        sameAsConsignee: $('importerSameAsConsignee') ? $('importerSameAsConsignee').checked : false
+      }
+    },
+    shipment: {
+      defaultOrigin:  val('defaultOrigin'),
+      totalWeight:    val('totalWeight'),
+      numPackages:    val('numPackages'),
+      shippingMethod: val('shippingMethod'),
+      carrier:        val('carrier')
     },
     items,
-    totals: { total: $('grandTotal').textContent || '0.00' },
-    parties: {
-      shipper: $('shipper').value || '',
-      soldto:  $('soldto').value || ''
+    totals: {
+      subtotal:     $('subtotal') ? $('subtotal').textContent : '0.00',
+      shippingCost: shippingCost,
+      insurance:    insurance,
+      total:        $('grandTotal').textContent || '0.00'
+    },
+    declaration: {
+      name: val('declarantName'),
+      date: val('declarantDate')
     }
   };
 }
@@ -240,28 +393,64 @@ function getState() {
 function setState(st) {
   if (!st) return;
 
-  // Handle both old flat format and new nested format
+  // Meta fields
   const meta = st.meta || {};
-  $('invoiceNumber').value = meta.invoice || st.invoiceNumber || '';
-  $('invoiceDate').value   = meta.date || st.invoiceDate || '';
-  $('waybill').value       = meta.waybill || st.waybill || '';
-  $('currency').value      = meta.currency || st.currency || 'USD';
+  setVal('invoiceNumber', meta.invoice || st.invoiceNumber || '');
+  setVal('invoiceDate',   meta.date || st.invoiceDate || '');
+  setVal('waybill',       meta.waybill || st.waybill || '');
+  setVal('currency',      meta.currency || st.currency || 'USD');
+  setVal('shipmentRef',   meta.shipmentRef || '');
+  setSel('incoterms',     meta.incoterms || 'DAP');
+  setSel('reasonForExport', meta.reasonForExport || 'Sale');
 
+  // Parties — handle v3 legacy (plain strings) and v4 (objects)
   const parties = st.parties || {};
-  $('shipper').value = parties.shipper || st.shipper || '';
-  $('soldto').value  = parties.soldto || st.soldto || '';
+  if (typeof parties.shipper === 'string') {
+    // v3 legacy migration
+    writePartyFields('shipper', parties.shipper);
+  } else {
+    writePartyFields('shipper', parties.shipper);
+  }
 
-  // Clear existing rows
+  if (typeof parties.soldto === 'string') {
+    // v3 legacy: soldto → consignee
+    writePartyFields('consignee', parties.soldto);
+  } else if (parties.consignee) {
+    writePartyFields('consignee', parties.consignee);
+  }
+
+  if (parties.importer) {
+    if (typeof parties.importer === 'object') {
+      writePartyFields('importer', parties.importer);
+      const cb = $('importerSameAsConsignee');
+      if (cb) cb.checked = !!parties.importer.sameAsConsignee;
+    }
+  }
+
+  // Shipment details
+  const ship = st.shipment || {};
+  setVal('defaultOrigin',  ship.defaultOrigin || DEFAULT_ORIGIN);
+  setVal('totalWeight',    ship.totalWeight || '0.00');
+  setVal('numPackages',    ship.numPackages || '1');
+  setSel('shippingMethod', ship.shippingMethod || 'Express');
+  setSel('carrier',        ship.carrier || 'DHL');
+
+  // Totals
+  const totals = st.totals || {};
+  setVal('shippingCost', totals.shippingCost || '0.00');
+  setVal('insurance',    totals.insurance || '0.00');
+
+  // Declaration
+  const decl = st.declaration || {};
+  setVal('declarantName', decl.name || '');
+  setVal('declarantDate', decl.date || '');
+
+  // Clear existing rows and rebuild items
   [...$$('#items [data-row]')].forEach(r => r.remove());
-
-  // Add items
   const items = st.items || [];
   items.forEach(i => addRow({
-    qty:  i.qty,
-    desc: i.desc,
-    hs:   i.hs,
-    unit: i.unit,
-    sku:  i.sku || ''
+    qty: i.qty, desc: i.desc, hs: i.hs, unit: i.unit, sku: i.sku || '',
+    uom: i.uom || 'pcs', origin: i.origin || '', weight: i.weight || 0
   }));
   recalcTotals();
 }
@@ -276,21 +465,16 @@ function saveState() {
 
 function loadState() {
   try {
-    // Try current key first
     let raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
-      const st = JSON.parse(raw);
-      setState(st);
+      setState(JSON.parse(raw));
       return true;
     }
-
-    // Try legacy keys for migration
     for (const key of LEGACY_KEYS) {
       raw = localStorage.getItem(key);
       if (raw) {
-        const st = JSON.parse(raw);
-        setState(st);
-        saveState(); // re-save under new key
+        setState(JSON.parse(raw));
+        saveState();
         return true;
       }
     }
@@ -319,7 +503,6 @@ function setHistory(history) {
 
 function saveToHistory() {
   const st = getState();
-  // Don't save empty invoices
   if (!st.items.length && !st.meta.invoice) return;
 
   const entry = {
@@ -332,8 +515,6 @@ function saveToHistory() {
 
   const history = getHistory();
   history.unshift(entry);
-
-  // Cap at MAX_HISTORY
   if (history.length > MAX_HISTORY) history.length = MAX_HISTORY;
   setHistory(history);
 }
@@ -385,7 +566,6 @@ function toggleHistoryPanel(forceState) {
   }
 }
 
-// Close history panel when clicking outside
 document.addEventListener('click', (e) => {
   const wrap = document.querySelector('.history-wrap');
   if (wrap && !wrap.contains(e.target)) {
@@ -396,12 +576,19 @@ document.addEventListener('click', (e) => {
 // --- J: Export ---
 function exportCSV() {
   const st = getState();
-  const header = ['SKU', 'Description', 'HS Code', 'Qty', 'Unit', 'Line Total'];
+  const header = ['SKU', 'Description', 'HS Code', 'UoM', 'Qty', 'Unit Price', 'Origin', 'Net Weight (kg)', 'Line Total'];
   const rows = st.items.map(i =>
-    [i.sku || '', i.desc, i.hs, i.qty, fmt(i.unit), fmt(i.qty * i.unit)]
+    [i.sku || '', i.desc, i.hs, i.uom, i.qty, fmt(i.unit), i.origin, fmt(i.weight), fmt(i.qty * i.unit)]
   );
   rows.push([]);
-  rows.push(['', '', '', 'Total', '', st.totals.total]);
+  rows.push(['', '', '', '', '', 'Subtotal', '', '', st.totals.subtotal]);
+  if (parseFloat(st.totals.shippingCost)) {
+    rows.push(['', '', '', '', '', 'Shipping', '', '', st.totals.shippingCost]);
+  }
+  if (parseFloat(st.totals.insurance)) {
+    rows.push(['', '', '', '', '', 'Insurance', '', '', st.totals.insurance]);
+  }
+  rows.push(['', '', '', '', '', 'Grand Total', '', '', st.totals.total]);
 
   const csv = [
     header.join(','),
@@ -415,15 +602,27 @@ function exportJSON() {
   downloadFile('invoice.json', 'application/json', JSON.stringify(getState(), null, 2));
 }
 
-// --- K: Auto-date ---
-function setAutoDate() {
-  const el = $('invoiceDate');
-  if (el && !el.value) {
-    const d = new Date();
-    const dd = String(d.getDate()).padStart(2, '0');
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    el.value = `${dd}-${mm}-${d.getFullYear()}`;
+// --- K: Importer "Same as Consignee" ---
+function toggleImporterSame() {
+  const cb = $('importerSameAsConsignee');
+  const fields = ['importerName', 'importerAddr', 'importerPhone', 'importerEmail', 'importerTaxId'];
+  const sources = ['consigneeName', 'consigneeAddr', 'consigneePhone', 'consigneeEmail', 'consigneeTaxId'];
+
+  if (cb.checked) {
+    fields.forEach((fid, i) => {
+      const el = $(fid);
+      const src = $(sources[i]);
+      if (el && src) el.value = src.value;
+      if (el) el.setAttribute('readonly', '');
+      if (el && el.tagName === 'TEXTAREA') el.setAttribute('readonly', '');
+    });
+  } else {
+    fields.forEach(fid => {
+      const el = $(fid);
+      if (el) el.removeAttribute('readonly');
+    });
   }
+  saveState();
 }
 
 // --- L: Invoice Number ---
@@ -434,18 +633,42 @@ function generateInvoiceNumber() {
 
 // --- M: New Invoice ---
 function newInvoice() {
-  // Save current invoice to history before clearing
   saveToHistory();
 
-  // Clear all rows
+  // Clear items
   [...$$('#items [data-row]')].forEach(r => r.remove());
   $('grandTotal').textContent = '0.00';
+  if ($('subtotal')) $('subtotal').textContent = '0.00';
 
-  // Reset with defaults
+  // Reset meta
   generateInvoiceNumber();
-  setAutoDate();
-  addRow({ qty: 2, desc: 'Ray-Ban Meta Sunglasses', hs: '9004.10.3', unit: 299, sku: '' });
-  addRow({ qty: 3, desc: 'Meta Quest Link Cable', hs: '9504.90', unit: 79.99, sku: '' });
+  setVal('invoiceDate', todayStr());
+  setVal('waybill', '');
+  setVal('shipmentRef', '');
+  setSel('incoterms', 'DAP');
+  setSel('reasonForExport', 'Sale');
+
+  // Reset shipment
+  setVal('defaultOrigin', DEFAULT_ORIGIN);
+  setVal('numPackages', '1');
+  setSel('shippingMethod', 'Express');
+  setSel('carrier', 'DHL');
+
+  // Reset totals
+  setVal('shippingCost', '0.00');
+  setVal('insurance', '0.00');
+
+  // Reset declaration
+  setVal('declarantName', '');
+  setVal('declarantDate', todayStr());
+
+  // Uncheck importer same
+  const cb = $('importerSameAsConsignee');
+  if (cb) cb.checked = false;
+
+  // Default items
+  addRow({ qty: 2, desc: 'Ray-Ban Meta Sunglasses', hs: '9004.10.3', unit: 299, sku: '', uom: 'pcs', origin: 'US', weight: 0.05 });
+  addRow({ qty: 3, desc: 'Meta Quest Link Cable', hs: '9504.90', unit: 79.99, sku: '', uom: 'pcs', origin: 'CN', weight: 0.10 });
   saveState();
 }
 
@@ -454,19 +677,41 @@ function init() {
   loadTheme();
   populateProductDropdown();
 
-  // Auto-save on meta field edits
-  ['invoiceNumber', 'invoiceDate', 'waybill', 'currency', 'shipper', 'soldto'].forEach(id => {
+  // Auto-save on all form field edits
+  const autoSaveFields = [
+    'invoiceNumber', 'invoiceDate', 'waybill', 'currency', 'shipmentRef',
+    'incoterms', 'reasonForExport',
+    'shipperName', 'shipperAddr', 'shipperPhone', 'shipperEmail', 'shipperTaxId',
+    'consigneeName', 'consigneeAddr', 'consigneePhone', 'consigneeEmail', 'consigneeTaxId',
+    'importerName', 'importerAddr', 'importerPhone', 'importerEmail', 'importerTaxId',
+    'defaultOrigin', 'numPackages', 'shippingMethod', 'carrier',
+    'shippingCost', 'insurance',
+    'declarantName', 'declarantDate'
+  ];
+
+  autoSaveFields.forEach(id => {
     const el = $(id);
-    if (el) el.addEventListener('input', () => {
-      if (id === 'currency') recalcTotals();
-      saveState();
-    });
+    if (el) {
+      el.addEventListener('input', () => {
+        if (id === 'currency' || id === 'shippingCost' || id === 'insurance') recalcTotals();
+        saveState();
+      });
+      el.addEventListener('change', () => {
+        if (id === 'currency' || id === 'shippingCost' || id === 'insurance') recalcTotals();
+        saveState();
+      });
+    }
   });
 
   // Live recalc + auto-save on item edits (event delegation)
   $('items').addEventListener('input', e => {
-    if (e.target.matches('.qty, .unit, .desc, .hs')) {
+    if (e.target.matches('.qty, .unit, .desc, .hs, .origin, .weight')) {
       recalcTotals();
+      saveState();
+    }
+  });
+  $('items').addEventListener('change', e => {
+    if (e.target.matches('.uom')) {
       saveState();
     }
   });
@@ -474,9 +719,10 @@ function init() {
   // Restore saved state or create default invoice
   if (!loadState()) {
     generateInvoiceNumber();
-    setAutoDate();
-    addRow({ qty: 2, desc: 'Ray-Ban Meta Sunglasses', hs: '9004.10.3', unit: 299, sku: '' });
-    addRow({ qty: 3, desc: 'Meta Quest Link Cable', hs: '9504.90', unit: 79.99, sku: '' });
+    setVal('invoiceDate', todayStr());
+    setVal('declarantDate', todayStr());
+    addRow({ qty: 2, desc: 'Ray-Ban Meta Sunglasses', hs: '9004.10.3', unit: 299, sku: '', uom: 'pcs', origin: 'US', weight: 0.05 });
+    addRow({ qty: 3, desc: 'Meta Quest Link Cable', hs: '9504.90', unit: 79.99, sku: '', uom: 'pcs', origin: 'CN', weight: 0.10 });
   }
 }
 
