@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Commercial Invoice</title>
-  <link rel="stylesheet" href="css/invoice.css?v=5.1" />
+  <link rel="stylesheet" href="css/invoice.css?v=5.2" />
 </head>
 <body>
 
@@ -30,17 +30,19 @@
         </select>
         <button class="btn" onclick="addProduct()">Add</button>
       </div>
-      <button class="btn" id="settingsToggleBtn" onclick="toggleSettingsPanel()">Settings</button>
+      <button class="btn" onclick="togglePanel('productsPanel')">Products</button>
+      <button class="btn" onclick="togglePanel('contactsPanel')">Contacts</button>
+      <button class="btn" id="settingsToggleBtn" onclick="togglePanel('settingsPanel')">Settings</button>
     </div>
   </div>
 
-  <!-- Settings Overlay (click to close) -->
-  <div class="settings-overlay" id="settingsOverlay" onclick="toggleSettingsPanel()"></div>
+  <!-- Panel Overlay (click to close any open panel) -->
+  <div class="settings-overlay" id="settingsOverlay" onclick="closeAllPanels()"></div>
 
-  <!-- Settings Panel (floating) -->
-  <div class="settings-panel" id="settingsPanel">
-    <div class="settings-inner">
-      <h3>Settings <button class="settings-close" onclick="toggleSettingsPanel()" title="Close">&times;</button></h3>
+  <!-- Settings Panel -->
+  <div class="side-panel" id="settingsPanel">
+    <div class="side-panel-inner">
+      <h3>Settings <button class="panel-close" onclick="closeAllPanels()" title="Close">&times;</button></h3>
       <div class="settings-group">
         <h4>Show / Hide Sections</h4>
         <label class="toggle-row"><input type="checkbox" id="togShipmentRef" checked onchange="applyVisibility()" /> Shipment Reference</label>
@@ -55,20 +57,33 @@
         <label class="toggle-row"><input type="checkbox" id="togInsurance" checked onchange="applyVisibility()" /> Insurance</label>
         <label class="toggle-row"><input type="checkbox" id="togDeclaration" checked onchange="applyVisibility()" /> Declaration</label>
       </div>
-      <div class="settings-group">
-        <h4>Address Book</h4>
-        <div class="address-book-controls">
-          <button class="btn" onclick="saveToAddressBook('shipper')">Save Shipper</button>
-          <button class="btn" onclick="saveToAddressBook('consignee')">Save Consignee</button>
-          <button class="btn" onclick="saveToAddressBook('importer')">Save Importer</button>
-        </div>
-        <div class="address-book-controls">
-          <button class="btn" onclick="exportAddressBook()">Export Contacts</button>
-          <button class="btn" onclick="importAddressBook()">Import Contacts</button>
-        </div>
-        <input type="text" id="addressBookSearch" class="address-book-search" placeholder="Search contacts..." oninput="renderAddressBook()" />
-        <div id="addressBookList" class="address-book-list"></div>
+    </div>
+  </div>
+
+  <!-- Contacts Panel -->
+  <div class="side-panel" id="contactsPanel">
+    <div class="side-panel-inner">
+      <h3>Contacts <button class="panel-close" onclick="closeAllPanels()" title="Close">&times;</button></h3>
+      <div class="address-book-controls">
+        <button class="btn" onclick="saveToAddressBook('shipper')">Save Shipper</button>
+        <button class="btn" onclick="saveToAddressBook('consignee')">Save Consignee</button>
+        <button class="btn" onclick="saveToAddressBook('importer')">Save Importer</button>
       </div>
+      <div class="address-book-controls">
+        <button class="btn" onclick="exportAddressBook()">Export</button>
+        <button class="btn" onclick="importAddressBook()">Import</button>
+      </div>
+      <input type="text" id="addressBookSearch" class="address-book-search" placeholder="Search contacts..." oninput="renderAddressBook()" />
+      <div id="addressBookList" class="address-book-list"></div>
+    </div>
+  </div>
+
+  <!-- Products Panel -->
+  <div class="side-panel" id="productsPanel">
+    <div class="side-panel-inner">
+      <h3>Product Catalogue <button class="panel-close" onclick="closeAllPanels()" title="Close">&times;</button></h3>
+      <input type="text" id="productSearch" class="product-search" placeholder="Search products..." oninput="renderProductPanel()" />
+      <div id="productPanelList"></div>
     </div>
   </div>
 
@@ -231,7 +246,7 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
-  <script src="js/catalogue.js?v=5.1"></script>
-  <script src="js/invoice.js?v=5.1"></script>
+  <script src="js/catalogue.js?v=5.2"></script>
+  <script src="js/invoice.js?v=5.2"></script>
 </body>
 </html>

@@ -55,7 +55,7 @@ describe('Settings panel', () => {
   });
 
   test('close button exists in settings panel', () => {
-    const closeBtn = env.document.querySelector('.settings-close');
+    const closeBtn = env.document.querySelector('#settingsPanel .panel-close');
     expect(closeBtn).not.toBeNull();
     expect(closeBtn.textContent).toBe('×');
   });

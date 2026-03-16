@@ -1,5 +1,20 @@
 # Changelog
 
+## v5.2 — 2026-03-16 — Side Panels, Sticky Toolbar & Product Browser
+
+### Added
+- **Sticky toolbar** — stays fixed at the top of the page when scrolling
+- **Product catalogue panel** — browsable by category with search, HS codes, origin, prices, and one-click "+ Add" buttons
+- **Contacts panel** — address book separated from settings into its own dedicated panel
+- **Generic side panel system** — Products, Contacts, and Settings each slide in from the right; only one open at a time
+
+### Changed
+- Address textareas enlarged from 50px to 80px so full multi-line addresses display without cropping
+- Settings panel trimmed to visibility toggles only (address book moved to Contacts)
+- Toolbar buttons reorganised: Products | Contacts | Settings
+- Side panels use shared `.side-panel` base class instead of per-panel CSS
+- Cache-busted to `v=5.2`
+
 ## v5 — 2026-03-16 — Floating Settings, PDF Download & Enhanced Address Book
 
 ### Added

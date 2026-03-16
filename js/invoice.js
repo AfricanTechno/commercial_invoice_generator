@@ -787,13 +787,33 @@ function newInvoice() {
 }
 
 // --- N: Settings & Visibility ---
-function toggleSettingsPanel() {
-  const panel = $('settingsPanel');
+const PANEL_IDS = ['settingsPanel', 'contactsPanel', 'productsPanel'];
+
+function closeAllPanels() {
+  PANEL_IDS.forEach(id => {
+    const el = $(id);
+    if (el) el.classList.remove('open');
+  });
   const overlay = $('settingsOverlay');
-  if (!panel) return;
-  panel.classList.toggle('open');
-  if (overlay) overlay.classList.toggle('open');
+  if (overlay) overlay.classList.remove('open');
 }
+
+function togglePanel(panelId) {
+  const panel = $(panelId);
+  if (!panel) return;
+  const wasOpen = panel.classList.contains('open');
+  closeAllPanels();
+  if (!wasOpen) {
+    panel.classList.add('open');
+    const overlay = $('settingsOverlay');
+    if (overlay) overlay.classList.add('open');
+    // Render product panel content on open
+    if (panelId === 'productsPanel') renderProductPanel();
+  }
+}
+
+// Legacy alias
+function toggleSettingsPanel() { togglePanel('settingsPanel'); }
 
 function getSettings() {
   const settings = {};
@@ -1085,6 +1105,71 @@ function importAddressBook() {
     reader.readAsText(file);
   };
   input.click();
+}
+
+// --- O5: Product Panel ---
+function renderProductPanel() {
+  const list = $('productPanelList');
+  if (!list) return;
+
+  const searchEl = $('productSearch');
+  const search = searchEl ? (searchEl.value || '').toLowerCase() : '';
+
+  let html = '';
+  CATALOGUE_GROUPS.forEach(group => {
+    const items = group.items.filter(name => {
+      if (!CATALOGUE.hasOwnProperty(name)) return false;
+      if (!search) return true;
+      const p = CATALOGUE[name];
+      return name.toLowerCase().includes(search) ||
+             (p.hs || '').toLowerCase().includes(search) ||
+             (p.sku || '').toLowerCase().includes(search);
+    });
+    if (!items.length) return;
+
+    html += '<div class="product-group-label">' + escapeHtml(group.label) + '</div>';
+    items.forEach(name => {
+      const p = CATALOGUE[name];
+      const detail = ['HS: ' + p.hs, p.origin || DEFAULT_ORIGIN, fmt(p.unit) + ' ' + (val('currency') || 'USD')]
+        .filter(Boolean).join(' | ');
+      html += `<div class="product-item" onclick="addProductFromPanel('${escapeHtml(name)}')">
+        <div class="product-item-info">
+          <div class="product-item-name">${escapeHtml(name)}</div>
+          <div class="product-item-detail">${escapeHtml(detail)}</div>
+        </div>
+        <button class="product-item-add" onclick="event.stopPropagation(); addProductFromPanel('${escapeHtml(name)}')">+ Add</button>
+      </div>`;
+    });
+  });
+
+  if (!html) {
+    html = '<div class="history-empty">No matching products</div>';
+  }
+  list.innerHTML = html;
+}
+
+function addProductFromPanel(key) {
+  const p = CATALOGUE[key];
+  if (!p) return;
+
+  // Check for existing row with same product
+  const existing = [...$$('#items [data-row]')].find(r => {
+    const d = rowToData(r);
+    return d.desc === key && d.hs === p.hs && fmt(d.unit) === fmt(p.unit);
+  });
+
+  if (existing) {
+    const qtyInput = existing.querySelector('.qty');
+    qtyInput.value = (parseFloat(qtyInput.value || 0) + 1).toString();
+    recalcTotals();
+    saveState();
+  } else {
+    addRow({
+      qty: 1, desc: key, hs: p.hs, unit: p.unit, sku: p.sku || '',
+      uom: 'pcs', origin: p.origin || DEFAULT_ORIGIN, weight: p.weight || 0
+    });
+  }
+  showToast('Added "' + key + '"');
 }
 
 // --- P: Event Bindings & Initialization ---

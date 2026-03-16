@@ -13,8 +13,10 @@ A lightweight web app for creating, editing, and printing customs-compliant comm
 - **Shipment summary** — Subtotal, editable Shipping Cost and Insurance, calculated Grand Total
 - **Declaration section** — exportable statement with signature line for customs clearance
 - **Auto-calculated totals** — line totals, subtotal, grand total, and total weight update live
-- **Floating settings panel** — slide-in overlay to toggle section visibility without leaving the invoice
-- **Address book** — save, search, edit, and load contacts directly from party card dropdowns; export/import as JSON
+- **Sticky toolbar** — stays fixed at the top when scrolling so all actions remain accessible
+- **Product catalogue panel** — browse all products by category with search, view HS codes and prices, add to invoice with one click
+- **Contacts panel** — save, search, edit, and load contacts directly from party card dropdowns; export/import as JSON
+- **Settings panel** — slide-in overlay to toggle section visibility without leaving the invoice
 - **PDF download** — client-side PDF generation via html2canvas + jsPDF for easy mobile sharing
 - **Toast notifications** — visual feedback on save, load, and delete actions
 - **Dark mode** toggle (print always stays black-on-white)
