@@ -6,8 +6,9 @@ const { createInvoiceDOM } = require('./setup');
 
 let env;
 
-beforeEach(() => {
+beforeEach(async () => {
   env = createInvoiceDOM();
+  await env.ready;
 });
 
 afterEach(() => {
@@ -25,6 +26,15 @@ function $(id) {
 
 function $$(sel) {
   return env.document.querySelectorAll(sel);
+}
+
+function setPartyAddress(prefix, fields) {
+  if (fields.address1 !== undefined) $(prefix + 'Address1').value = fields.address1;
+  if (fields.address2 !== undefined) $(prefix + 'Address2').value = fields.address2;
+  if (fields.city !== undefined) $(prefix + 'City').value = fields.city;
+  if (fields.stateProvince !== undefined) $(prefix + 'StateProvince').value = fields.stateProvince;
+  if (fields.postalCode !== undefined) $(prefix + 'PostalCode').value = fields.postalCode;
+  if (fields.country !== undefined) $(prefix + 'Country').value = fields.country;
 }
 
 // ============================================================
@@ -48,11 +58,6 @@ describe('Initialization', () => {
   test('default rows are created on fresh load', () => {
     const rows = $$('#items [data-row]');
     expect(rows.length).toBe(2);
-  });
-
-  test('product dropdown is populated with optgroups', () => {
-    const groups = $('productSelect').querySelectorAll('optgroup');
-    expect(groups.length).toBeGreaterThan(0);
   });
 
   test('grand total is calculated on init', () => {
@@ -85,7 +90,7 @@ describe('Row management', () => {
     expect(last.querySelector('.qty').value).toBe('1');
     expect(last.querySelector('.desc').value).toBe('New Product');
     expect(last.querySelector('.uom').value).toBe('pcs');
-    expect(last.querySelector('.origin').value).toBe('US');
+    expect(last.querySelector('.origin').value).toBe('CN');
   });
 
   test('deleteRow() removes a row', () => {
@@ -108,10 +113,9 @@ describe('Row management', () => {
 // Product Addition
 // ============================================================
 describe('Product addition', () => {
-  test('addProduct() adds a catalogue product', () => {
+  test('addProductFromPanel() adds a catalogue product', () => {
     const before = $$('#items [data-row]').length;
-    $('productSelect').value = 'RANGE 2 3D Scanner';
-    call('addProduct');
+    call('addProductFromPanel', 'RANGE 2 3D Scanner');
     const after = $$('#items [data-row]').length;
     expect(after).toBe(before + 1);
 
@@ -122,19 +126,30 @@ describe('Product addition', () => {
     expect(lastRow.querySelector('.origin').value).toBe('CN');
   });
 
-  test('addProduct() increments qty for duplicate product', () => {
-    // Default rows include Ray-Ban with qty 2
-    $('productSelect').value = 'Ray-Ban Meta Sunglasses';
-    call('addProduct');
+  test('addProductFromPanel() increments qty for duplicate product', () => {
+    call('addProductFromPanel', 'Ray-Ban Meta Sunglasses');
     const row = $$('#items [data-row]')[0];
     expect(row.querySelector('.qty').value).toBe('3');
   });
 
-  test('addProduct() does nothing when no product selected', () => {
-    const before = $$('#items [data-row]').length;
-    $('productSelect').value = '';
-    call('addProduct');
-    expect($$('#items [data-row]').length).toBe(before);
+  test('invoice page no longer shows the product picker controls', () => {
+    expect($('productSelect')).toBeNull();
+  });
+
+  test('product library entries can be created and used on the invoice', async () => {
+    await call('startNewProduct');
+    call('updateProductEditDraft', 'name', 'Library Test Product');
+    call('updateProductEditDraft', 'category', 'Other');
+    call('updateProductEditDraft', 'hs', '9006.91.00');
+    call('updateProductEditDraft', 'unit', '149.99');
+    call('updateProductEditDraft', 'origin', 'US');
+    call('updateProductEditDraft', 'weight', '0.75');
+    await call('saveProductEntry', '__new__');
+
+    call('addProductFromPanel', 'Library Test Product');
+    const lastRow = $$('#items [data-row]')[$$('#items [data-row]').length - 1];
+    expect(lastRow.querySelector('.desc').value).toBe('Library Test Product');
+    expect(lastRow.querySelector('.origin').value).toBe('US');
   });
 });
 
@@ -226,11 +241,11 @@ describe('State persistence', () => {
     const state = {
       meta: { invoice: 'RESTORE-99', date: '01-01-2026', waybill: 'AWB-999', currency: 'GBP', shipmentRef: 'REF-1', incoterms: 'FOB', reasonForExport: 'Gift' },
       parties: {
-        shipper: { name: 'Restored Shipper', address: '123 Test St', phone: '555-1234', email: 'test@test.com', taxId: 'TX-99' },
-        consignee: { name: 'Restored Buyer', address: '456 Buy St', phone: '', email: '', taxId: '' },
-        importer: { name: '', address: '', phone: '', email: '', taxId: '', sameAsConsignee: false }
+        shipper: { name: 'Restored Shipper', address1: '123 Test St', city: 'London', postalCode: 'SW1A 1AA', country: 'GB', phone: '555-1234', email: 'test@test.com', taxId: 'TX-99' },
+        consignee: { name: 'Restored Buyer', address1: '456 Buy St', city: 'Manchester', country: 'GB', phone: '', email: '', taxId: '' },
+        importer: { name: '', address1: '', phone: '', email: '', taxId: '', sameAsConsignee: false }
       },
-      shipment: { defaultOrigin: 'GB', totalWeight: '1.00', numPackages: '2', shippingMethod: 'Economy', carrier: 'FedEx' },
+      shipment: { defaultOrigin: 'GB', totalWeight: '1.00', numPackages: '2', shippingMethod: 'Economy', carrier: 'FedEx', carrierContactName: 'Jamie' },
       items: [
         { qty: 5, desc: 'Test Item', hs: '1234.56', unit: 10, sku: 'TST', uom: 'box', origin: 'GB', weight: 0.2 }
       ],
@@ -243,8 +258,12 @@ describe('State persistence', () => {
     expect($('invoiceNumber').value).toBe('RESTORE-99');
     expect($('currency').value).toBe('GBP');
     expect($('shipperName').value).toBe('Restored Shipper');
+    expect($('shipperAddress1').value).toBe('123 Test St');
+    expect($('shipperCity').value).toBe('London');
     expect($('consigneeName').value).toBe('Restored Buyer');
+    expect($('consigneeAddress1').value).toBe('456 Buy St');
     expect($('defaultOrigin').value).toBe('GB');
+    expect($('carrierContactName').value).toBe('Jamie');
     expect($('declarantName').value).toBe('Test Signer');
 
     const rows = $$('#items [data-row]');
@@ -275,10 +294,20 @@ describe('State persistence', () => {
     };
 
     call('setState', legacyState);
-    // String shipper should go to address field
-    expect($('shipperAddr').value).toBe('123 Old Address');
-    // soldto should map to consignee address
-    expect($('consigneeAddr').value).toBe('456 Old Buyer');
+    expect($('shipperAddress1').value).toBe('123 Old Address');
+    expect($('consigneeAddress1').value).toBe('456 Old Buyer');
+  });
+
+  test('legacy object addresses migrate into structured address fields', () => {
+    call('setState', {
+      parties: {
+        shipper: { name: 'Legacy Shipper', address: 'Line 1\nLine 2\nLine 3' }
+      },
+      items: []
+    });
+
+    expect($('shipperAddress1').value).toBe('Line 1');
+    expect($('shipperAddress2').value).toBe('Line 2, Line 3');
   });
 });
 
@@ -288,14 +317,18 @@ describe('State persistence', () => {
 describe('Importer same as consignee', () => {
   test('checking the box copies consignee to importer', () => {
     $('consigneeName').value = 'Buyer Co';
+    setPartyAddress('consignee', { address1: '1 Test Rd', city: 'Johannesburg', country: 'ZA' });
     $('consigneePhone').value = '+27123456';
     const cb = $('importerSameAsConsignee');
     cb.checked = true;
     call('toggleImporterSame');
 
     expect($('importerName').value).toBe('Buyer Co');
+    expect($('importerAddress1').value).toBe('1 Test Rd');
+    expect($('importerCity').value).toBe('Johannesburg');
     expect($('importerPhone').value).toBe('+27123456');
     expect($('importerName').hasAttribute('readonly')).toBe(true);
+    expect($('importerCountry').disabled).toBe(true);
   });
 
   test('unchecking the box re-enables importer fields', () => {
@@ -306,6 +339,7 @@ describe('Importer same as consignee', () => {
     call('toggleImporterSame');
 
     expect($('importerName').hasAttribute('readonly')).toBe(false);
+    expect($('importerCountry').disabled).toBe(false);
   });
 });
 
@@ -417,10 +451,10 @@ describe('Print block', () => {
     expect(block.querySelector('table')).not.toBeNull();
   });
 
-  test('print block contains 9 table columns', () => {
+  test('print block contains 7 table columns with the new default visibility', () => {
     call('buildPrintBlock');
     const ths = $('printBlock').querySelectorAll('th');
-    expect(ths.length).toBe(9);
+    expect(ths.length).toBe(7);
   });
 
   test('print block contains party info', () => {
@@ -430,7 +464,9 @@ describe('Print block', () => {
     expect(html).toContain('Consignee');
   });
 
-  test('print block contains declaration', () => {
+  test('print block contains declaration when toggled on', () => {
+    $('togDeclaration').checked = true;
+    call('applyVisibility');
     call('buildPrintBlock');
     const html = $('printBlock').innerHTML;
     expect(html).toContain('declare');
@@ -438,10 +474,12 @@ describe('Print block', () => {
   });
 
   test('print block contains shipment details', () => {
+    $('carrierContactName').value = 'Alex';
     call('buildPrintBlock');
     const html = $('printBlock').innerHTML;
     expect(html).toContain('Incoterms');
     expect(html).toContain('Carrier');
+    expect(html).toContain('Carrier Contact');
   });
 });
 
@@ -450,11 +488,15 @@ describe('Print block', () => {
 // ============================================================
 describe('Invoice history', () => {
   test('saveToHistory() stores an entry', () => {
+    $('carrier').value = 'UPS';
+    $('carrierContactName').value = 'Daliso';
     call('saveToHistory');
     const history = call('getHistory');
     expect(history.length).toBeGreaterThan(0);
     expect(history[0]).toHaveProperty('id');
     expect(history[0]).toHaveProperty('state');
+    expect(history[0].carrier).toBe('UPS');
+    expect(history[0].carrierContactName).toBe('Daliso');
   });
 
   test('loadFromHistory() restores a saved invoice', () => {
@@ -475,6 +517,40 @@ describe('Invoice history', () => {
     }
     const history = call('getHistory');
     expect(history.length).toBeLessThanOrEqual(50);
+  });
+
+  test('renderHistoryList shows a carrier filter', () => {
+    call('saveToHistory');
+    call('renderHistoryList');
+    expect($('historyCarrierFilter')).not.toBeNull();
+  });
+
+  test('history can be filtered by carrier', () => {
+    $('invoiceNumber').value = 'DHL-1';
+    $('carrier').value = 'DHL';
+    call('saveToHistory');
+    $('invoiceNumber').value = 'UPS-1';
+    $('carrier').value = 'UPS';
+    call('saveToHistory');
+
+    call('renderHistoryList');
+    $('historyCarrierFilter').value = 'UPS';
+    call('renderHistoryList');
+
+    const items = [...env.document.querySelectorAll('.history-item')].map((item) => item.textContent);
+    expect(items.length).toBe(1);
+    expect(items[0]).toContain('UPS-1');
+  });
+
+  test('history shows optional carrier contact name when present', () => {
+    $('invoiceNumber').value = 'CONTACT-1';
+    $('carrier').value = 'DHL';
+    $('carrierContactName').value = 'Alice';
+    call('saveToHistory');
+
+    call('renderHistoryList');
+    const html = $('historyPanel').textContent;
+    expect(html).toContain('Carrier Contact: Alice');
   });
 });
 
@@ -506,14 +582,14 @@ describe('DOM structure', () => {
 
   test('all party field IDs exist', () => {
     ['shipper', 'consignee', 'importer'].forEach(prefix => {
-      ['Name', 'Addr', 'Phone', 'Email', 'TaxId'].forEach(suffix => {
+      ['Name', 'Address1', 'Address2', 'City', 'StateProvince', 'PostalCode', 'Country', 'Phone', 'Email', 'TaxId'].forEach(suffix => {
         expect($(prefix + suffix)).not.toBeNull();
       });
     });
   });
 
   test('all shipment detail IDs exist', () => {
-    ['defaultOrigin', 'totalWeight', 'numPackages', 'shippingMethod', 'carrier'].forEach(id => {
+    ['defaultOrigin', 'totalWeight', 'numPackages', 'shippingMethod', 'carrier', 'carrierContactName'].forEach(id => {
       expect($(id)).not.toBeNull();
     });
   });

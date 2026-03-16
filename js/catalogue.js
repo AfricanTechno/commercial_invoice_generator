@@ -4,7 +4,7 @@
 // ============================================================
 
 // Default country of origin for new items
-var DEFAULT_ORIGIN = "US";
+var DEFAULT_ORIGIN = "CN";
 
 var CATALOGUE = {
   // Eyewear

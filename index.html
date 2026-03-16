@@ -3,35 +3,27 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Commercial Invoice</title>
-  <link rel="stylesheet" href="css/invoice.css?v=5.3" />
+  <title>Invoice Generator</title>
+  <link rel="stylesheet" href="css/invoice.css?v=6.2" />
 </head>
 <body>
 
   <!-- Toolbar -->
   <div class="bar">
     <div class="toolbar">
-      <strong>Invoice</strong>
+      <strong>Invoice Generator</strong>
       <div class="actions">
-        <button class="btn" id="themeToggle" onclick="toggleTheme()">Dark</button>
         <button class="btn" onclick="printInvoice()">Print</button>
+        <button class="btn" onclick="downloadPDF()">PDF</button>
         <button class="btn" onclick="newInvoice()">New Invoice</button>
         <button class="btn" onclick="exportCSV()">Export CSV</button>
         <button class="btn" onclick="exportJSON()">Export JSON</button>
-        <button class="btn" onclick="downloadPDF()">PDF</button>
+        <a class="btn nav-btn" href="library.html">Library</a>
         <div class="history-wrap">
           <button class="btn" onclick="toggleHistoryPanel()">History</button>
           <div class="history-panel" id="historyPanel"></div>
         </div>
       </div>
-      <div class="picker">
-        <select id="productSelect">
-          <option value="">+ Add product...</option>
-        </select>
-        <button class="btn" onclick="addProduct()">Add</button>
-      </div>
-      <button class="btn" onclick="togglePanel('productsPanel')">Products</button>
-      <button class="btn" onclick="togglePanel('contactsPanel')">Contacts</button>
       <button class="btn" id="settingsToggleBtn" onclick="togglePanel('settingsPanel')">Settings</button>
     </div>
   </div>
@@ -44,18 +36,58 @@
     <div class="side-panel-inner">
       <h3>Settings <button class="panel-close" onclick="closeAllPanels()" title="Close">&times;</button></h3>
       <div class="settings-group">
+        <h4>Appearance</h4>
+        <div class="address-book-controls">
+          <button class="btn" id="themeToggle" onclick="toggleTheme()">Dark</button>
+        </div>
+      </div>
+      <div class="settings-group">
         <h4>Show / Hide Sections</h4>
-        <label class="toggle-row"><input type="checkbox" id="togShipmentRef" checked onchange="applyVisibility()" /> Shipment Reference</label>
+        <label class="toggle-row"><input type="checkbox" id="togShipmentRef" onchange="applyVisibility()" /> Shipment Reference</label>
         <label class="toggle-row"><input type="checkbox" id="togIncoterms" checked onchange="applyVisibility()" /> Incoterms</label>
-        <label class="toggle-row"><input type="checkbox" id="togReasonForExport" checked onchange="applyVisibility()" /> Reason for Export</label>
-        <label class="toggle-row"><input type="checkbox" id="togImporter" checked onchange="applyVisibility()" /> Importer of Record</label>
+        <label class="toggle-row"><input type="checkbox" id="togReasonForExport" onchange="applyVisibility()" /> Reason for Export</label>
+        <label class="toggle-row"><input type="checkbox" id="togImporter" onchange="applyVisibility()" /> Importer of Record</label>
         <label class="toggle-row"><input type="checkbox" id="togShipmentDetails" checked onchange="applyVisibility()" /> Shipment Details</label>
         <label class="toggle-row"><input type="checkbox" id="togUom" checked onchange="applyVisibility()" /> Unit of Measure Column</label>
-        <label class="toggle-row"><input type="checkbox" id="togOrigin" checked onchange="applyVisibility()" /> Country of Origin Column</label>
-        <label class="toggle-row"><input type="checkbox" id="togWeight" checked onchange="applyVisibility()" /> Weight Column</label>
-        <label class="toggle-row"><input type="checkbox" id="togShippingCost" checked onchange="applyVisibility()" /> Shipping Cost</label>
-        <label class="toggle-row"><input type="checkbox" id="togInsurance" checked onchange="applyVisibility()" /> Insurance</label>
-        <label class="toggle-row"><input type="checkbox" id="togDeclaration" checked onchange="applyVisibility()" /> Declaration</label>
+        <label class="toggle-row"><input type="checkbox" id="togOrigin" onchange="applyVisibility()" /> Country of Origin Column</label>
+        <label class="toggle-row"><input type="checkbox" id="togWeight" onchange="applyVisibility()" /> Weight Column</label>
+        <label class="toggle-row"><input type="checkbox" id="togShippingCost" onchange="applyVisibility()" /> Shipping Cost</label>
+        <label class="toggle-row"><input type="checkbox" id="togInsurance" onchange="applyVisibility()" /> Insurance</label>
+        <label class="toggle-row"><input type="checkbox" id="togDeclaration" onchange="applyVisibility()" /> Declaration</label>
+      </div>
+      <div class="settings-group">
+        <h4>My Company Profile</h4>
+        <div class="status-note" id="profileAuthNote">Sign in to save your shipper defaults.</div>
+        <div class="address-fields">
+          <label class="field"><span class="label">Linked Contact</span>
+            <select id="profileContactPicker" onchange="handleProfileContactChange()">
+              <option value="">No linked contact</option>
+            </select>
+          </label>
+          <label class="toggle-row profile-sync-toggle">
+            <input type="checkbox" id="profileSyncWithContact" onchange="handleProfileSyncToggle()" />
+            Keep profile in sync with linked contact
+          </label>
+        </div>
+        <label class="field"><span class="label">Company / Name</span><input id="profileName" /></label>
+        <div class="address-fields">
+          <label class="field"><span class="label">Address 1</span><input id="profileAddress1" /></label>
+          <label class="field"><span class="label">Address 2</span><input id="profileAddress2" /></label>
+          <label class="field"><span class="label">City</span><input id="profileCity" /></label>
+          <label class="field"><span class="label">State / Province</span><input id="profileStateProvince" /></label>
+          <label class="field"><span class="label">Postal / ZIP Code</span><input id="profilePostalCode" /></label>
+          <label class="field"><span class="label">Country</span><select id="profileCountry" class="country-select"></select></label>
+        </div>
+        <div class="party-row">
+          <label class="field"><span class="label">Phone</span><input id="profilePhone" /></label>
+          <label class="field"><span class="label">Email</span><input id="profileEmail" /></label>
+        </div>
+        <label class="field"><span class="label">Tax / VAT Number / Importer Code / ID Number</span><input id="profileTaxId" /></label>
+        <div class="address-book-controls">
+          <button class="btn" id="saveProfileBtn" onclick="saveCompanyProfile()">Save Profile</button>
+          <button class="btn" id="useProfileBtn" onclick="applySavedCompanyProfile()">Use On Invoice</button>
+          <button class="btn" id="clearProfileBtn" onclick="clearSavedCompanyProfile()">Clear Profile</button>
+        </div>
       </div>
     </div>
   </div>
@@ -64,14 +96,41 @@
   <div class="side-panel" id="contactsPanel">
     <div class="side-panel-inner">
       <h3>Contacts <button class="panel-close" onclick="closeAllPanels()" title="Close">&times;</button></h3>
-      <div class="address-book-controls">
-        <button class="btn" onclick="saveToAddressBook('shipper')">Save Shipper</button>
-        <button class="btn" onclick="saveToAddressBook('consignee')">Save Consignee</button>
-        <button class="btn" onclick="saveToAddressBook('importer')">Save Importer</button>
+      <div class="auth-card">
+        <div class="auth-status" id="authStatus">Address book sign-in required.</div>
+        <div class="status-note" id="cloudConfigNote">Set `window.APP_CONFIG` with your Supabase URL and anon key to enable cloud sync.</div>
+        <div class="party-row" id="authFields">
+          <label class="field"><span class="label">Email</span><input id="authEmail" type="email" autocomplete="username" /></label>
+          <label class="field"><span class="label">Password</span><input id="authPassword" type="password" autocomplete="current-password" /></label>
+        </div>
+        <div class="address-book-controls" id="authActions">
+          <button class="btn" id="signInBtn" onclick="signInAddressBook()">Sign In</button>
+          <button class="btn" id="signUpBtn" onclick="signUpAddressBook()">Create Account</button>
+          <button class="btn" id="signOutBtn" onclick="signOutAddressBook()">Sign Out</button>
+          <button class="btn" id="syncContactsBtn" onclick="syncAddressBook()">Sync Library</button>
+        </div>
+        <div class="status-note" id="syncStatus">Offline cache ready.</div>
+        <div class="local-save-indicator section-hidden" id="localSaveIndicator">Contacts and products are saved locally in this browser</div>
+      </div>
+      <div class="migration-banner section-hidden" id="migrationBanner">
+        <div class="migration-copy">Local contacts from an older version were found in this browser.</div>
+        <div class="address-book-controls">
+          <button class="btn" onclick="importLegacyLocalContacts()">Import Local Contacts</button>
+          <button class="btn" onclick="dismissLegacyMigration()">Dismiss</button>
+        </div>
       </div>
       <div class="address-book-controls">
-        <button class="btn" onclick="exportAddressBook()">Export</button>
-        <button class="btn" onclick="importAddressBook()">Import</button>
+        <select id="saveContactSource" class="address-book-action-select" data-contact-action="true">
+          <option value="shipper">Shipper / Exporter</option>
+          <option value="consignee">Consignee / Receiver</option>
+          <option value="importer">Importer of Record</option>
+        </select>
+        <button class="btn" data-contact-action="true" onclick="saveSelectedContact()">Save Contact</button>
+      </div>
+      <div class="address-book-controls">
+        <button class="btn" data-contact-action="true" onclick="exportAddressBook()">Export Backup</button>
+        <button class="btn" data-contact-action="true" onclick="importAddressBook()">Import Backup</button>
+        <button class="btn section-hidden" data-contact-action="true" id="loadSampleContactsBtn" onclick="loadSampleContacts()">Load Sample Data</button>
       </div>
       <input type="text" id="addressBookSearch" class="address-book-search" placeholder="Search contacts..." oninput="renderAddressBook()" />
       <div id="addressBookList" class="address-book-list"></div>
@@ -131,23 +190,37 @@
         <div class="party">
           <h3>Shipper / Exporter <select class="contact-picker" id="shipperPicker" onchange="pickContact(this, 'shipper')"><option value="">Load contact...</option></select></h3>
           <label class="field"><span class="label">Company / Name</span><input id="shipperName" /></label>
-          <label class="field"><span class="label">Address</span><textarea id="shipperAddr"></textarea></label>
+          <div class="address-fields">
+            <label class="field"><span class="label">Address 1</span><input id="shipperAddress1" /></label>
+            <label class="field"><span class="label">Address 2</span><input id="shipperAddress2" /></label>
+            <label class="field"><span class="label">City</span><input id="shipperCity" /></label>
+            <label class="field"><span class="label">State / Province</span><input id="shipperStateProvince" /></label>
+            <label class="field"><span class="label">Postal / ZIP Code</span><input id="shipperPostalCode" /></label>
+            <label class="field"><span class="label">Country</span><select id="shipperCountry" class="country-select"></select></label>
+          </div>
           <div class="party-row">
             <label class="field"><span class="label">Phone</span><input id="shipperPhone" /></label>
             <label class="field"><span class="label">Email</span><input id="shipperEmail" /></label>
           </div>
-          <label class="field"><span class="label">Tax / VAT ID</span><input id="shipperTaxId" /></label>
+          <label class="field"><span class="label">Tax / VAT Number / Importer Code / ID Number</span><input id="shipperTaxId" /></label>
         </div>
 
         <div class="party">
           <h3>Consignee / Receiver <select class="contact-picker" id="consigneePicker" onchange="pickContact(this, 'consignee')"><option value="">Load contact...</option></select></h3>
           <label class="field"><span class="label">Company / Name</span><input id="consigneeName" /></label>
-          <label class="field"><span class="label">Address</span><textarea id="consigneeAddr"></textarea></label>
+          <div class="address-fields">
+            <label class="field"><span class="label">Address 1</span><input id="consigneeAddress1" /></label>
+            <label class="field"><span class="label">Address 2</span><input id="consigneeAddress2" /></label>
+            <label class="field"><span class="label">City</span><input id="consigneeCity" /></label>
+            <label class="field"><span class="label">State / Province</span><input id="consigneeStateProvince" /></label>
+            <label class="field"><span class="label">Postal / ZIP Code</span><input id="consigneePostalCode" /></label>
+            <label class="field"><span class="label">Country</span><select id="consigneeCountry" class="country-select"></select></label>
+          </div>
           <div class="party-row">
             <label class="field"><span class="label">Phone</span><input id="consigneePhone" /></label>
             <label class="field"><span class="label">Email</span><input id="consigneeEmail" /></label>
           </div>
-          <label class="field"><span class="label">Tax / VAT ID</span><input id="consigneeTaxId" /></label>
+          <label class="field"><span class="label">Tax / VAT Number / Importer Code / ID Number</span><input id="consigneeTaxId" /></label>
         </div>
 
         <div class="party importer-party" id="importerSection">
@@ -157,18 +230,25 @@
             <label class="same-check"><input type="checkbox" id="importerSameAsConsignee" onclick="toggleImporterSame()" /> Same as Consignee</label>
           </h3>
           <label class="field"><span class="label">Company / Name</span><input id="importerName" /></label>
-          <label class="field"><span class="label">Address</span><textarea id="importerAddr"></textarea></label>
+          <div class="address-fields">
+            <label class="field"><span class="label">Address 1</span><input id="importerAddress1" /></label>
+            <label class="field"><span class="label">Address 2</span><input id="importerAddress2" /></label>
+            <label class="field"><span class="label">City</span><input id="importerCity" /></label>
+            <label class="field"><span class="label">State / Province</span><input id="importerStateProvince" /></label>
+            <label class="field"><span class="label">Postal / ZIP Code</span><input id="importerPostalCode" /></label>
+            <label class="field"><span class="label">Country</span><select id="importerCountry" class="country-select"></select></label>
+          </div>
           <div class="party-row">
             <label class="field"><span class="label">Phone</span><input id="importerPhone" /></label>
             <label class="field"><span class="label">Email</span><input id="importerEmail" /></label>
           </div>
-          <label class="field"><span class="label">Tax / VAT ID</span><input id="importerTaxId" /></label>
+          <label class="field"><span class="label">Tax / VAT Number / Importer Code / ID Number</span><input id="importerTaxId" /></label>
         </div>
       </div>
 
       <!-- 3. Shipment Details -->
       <div class="shipment-details" id="shipmentDetailsSection">
-        <label class="field"><span class="label">Default Origin</span><input id="defaultOrigin" value="US" /></label>
+        <label class="field"><span class="label">Default Origin</span><input id="defaultOrigin" value="CN" /></label>
         <label class="field"><span class="label">Total Weight (kg)</span><input id="totalWeight" value="0.00" readonly /></label>
         <label class="field"><span class="label">No. of Packages</span><input id="numPackages" value="1" inputmode="numeric" /></label>
         <label class="field">
@@ -189,6 +269,10 @@
             <option value="Aramex">Aramex</option>
             <option value="Other">Other</option>
           </select>
+        </label>
+        <label class="field">
+          <span class="label">Carrier Contact Name (Optional)</span>
+          <input id="carrierContactName" />
         </label>
       </div>
 
@@ -247,6 +331,8 @@
   <script src="lib/html2canvas.min.js"></script>
   <script src="lib/jspdf.umd.min.js"></script>
   <script src="js/catalogue.js?v=5.3"></script>
-  <script src="js/invoice.js?v=5.3"></script>
+  <script src="js/app-config.js?v=6.2"></script>
+  <script src="js/address-book-service.js?v=6.6"></script>
+  <script src="js/invoice.js?v=6.4"></script>
 </body>
 </html>

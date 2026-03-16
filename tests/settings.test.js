@@ -5,8 +5,9 @@ const { createInvoiceDOM } = require('./setup');
 
 let env;
 
-beforeEach(() => {
+beforeEach(async () => {
   env = createInvoiceDOM();
+  await env.ready;
 });
 
 afterEach(() => {
@@ -25,6 +26,37 @@ function $$(sel) {
   return env.document.querySelectorAll(sel);
 }
 
+function setPartyAddress(prefix, fields) {
+  if (fields.address1 !== undefined) $(prefix + 'Address1').value = fields.address1;
+  if (fields.address2 !== undefined) $(prefix + 'Address2').value = fields.address2;
+  if (fields.city !== undefined) $(prefix + 'City').value = fields.city;
+  if (fields.stateProvince !== undefined) $(prefix + 'StateProvince').value = fields.stateProvince;
+  if (fields.postalCode !== undefined) $(prefix + 'PostalCode').value = fields.postalCode;
+  if (fields.country !== undefined) $(prefix + 'Country').value = fields.country;
+}
+
+async function signInCloudTest() {
+  const repo = call('getRepo');
+  repo.__debugSetAuthState({
+    configured: true,
+    signedIn: true,
+    user: { id: 'test-user', email: 'test@example.com' },
+    email: 'test@example.com'
+  });
+  await call('syncAddressBook');
+}
+
+async function enterSignedOutCloudMode() {
+  const repo = call('getRepo');
+  repo.__debugSetAuthState({
+    configured: true,
+    signedIn: false,
+    user: null,
+    email: ''
+  });
+  await call('syncAddressBook');
+}
+
 // ============================================================
 // Settings Panel (floating overlay)
 // ============================================================
@@ -41,15 +73,12 @@ describe('Settings panel', () => {
     expect(overlay.classList.contains('open')).toBe(false);
   });
 
-  test('toggleSettingsPanel() opens both panel and overlay', () => {
-    call('toggleSettingsPanel');
+  test('togglePanel() opens and closes settings panel and overlay', () => {
+    call('togglePanel', 'settingsPanel');
     expect($('settingsPanel').classList.contains('open')).toBe(true);
     expect($('settingsOverlay').classList.contains('open')).toBe(true);
-  });
 
-  test('toggleSettingsPanel() closes both panel and overlay', () => {
-    call('toggleSettingsPanel');
-    call('toggleSettingsPanel');
+    call('togglePanel', 'settingsPanel');
     expect($('settingsPanel').classList.contains('open')).toBe(false);
     expect($('settingsOverlay').classList.contains('open')).toBe(false);
   });
@@ -58,13 +87,6 @@ describe('Settings panel', () => {
     const closeBtn = env.document.querySelector('#settingsPanel .panel-close');
     expect(closeBtn).not.toBeNull();
     expect(closeBtn.textContent).toBe('×');
-  });
-
-  test('toggleSettingsPanel() opens and closes the panel', () => {
-    call('toggleSettingsPanel');
-    expect($('settingsPanel').classList.contains('open')).toBe(true);
-    call('toggleSettingsPanel');
-    expect($('settingsPanel').classList.contains('open')).toBe(false);
   });
 
   test('all toggle checkboxes exist', () => {
@@ -81,15 +103,22 @@ describe('Settings panel', () => {
     });
   });
 
-  test('all toggles default to checked', () => {
-    const toggleIds = [
-      'togShipmentRef', 'togIncoterms', 'togReasonForExport',
-      'togImporter', 'togShipmentDetails',
-      'togUom', 'togOrigin', 'togWeight',
-      'togShippingCost', 'togInsurance', 'togDeclaration'
+  test('toggles default to expected states', () => {
+    const checkedByDefault = [
+      'togIncoterms',
+      'togShipmentDetails',
+      'togUom'
     ];
-    toggleIds.forEach(id => {
+    checkedByDefault.forEach(id => {
       expect($(id).checked).toBe(true);
+    });
+    // All other toggles are off by default
+    [
+      'togShipmentRef', 'togReasonForExport', 'togImporter',
+      'togOrigin', 'togWeight', 'togShippingCost',
+      'togInsurance', 'togDeclaration'
+    ].forEach(id => {
+      expect($(id).checked).toBe(false);
     });
   });
 });
@@ -225,9 +254,9 @@ describe('Print respects visibility', () => {
 // Address Book
 // ============================================================
 describe('Address book', () => {
-  beforeEach(() => {
-    // Clear seeded contacts so each test starts fresh
+  beforeEach(async () => {
     call('setAddressBook', []);
+    await signInCloudTest();
   });
 
   test('address book starts empty after clear', () => {
@@ -235,86 +264,151 @@ describe('Address book', () => {
     expect(book).toEqual([]);
   });
 
-  test('saveToAddressBook saves a party', () => {
+  test('saveToAddressBook saves a party', async () => {
     $('shipperName').value = 'Test Shipper';
-    $('shipperAddr').value = '123 Test Street';
+    setPartyAddress('shipper', { address1: '123 Test Street', city: 'Cape Town', country: 'ZA' });
     $('shipperPhone').value = '+1555000';
     $('shipperEmail').value = 'test@test.com';
 
-    call('saveToAddressBook', 'shipper');
+    await call('saveToAddressBook', 'shipper');
     const book = call('getAddressBook');
     expect(book.length).toBe(1);
     expect(book[0].name).toBe('Test Shipper');
     expect(book[0].phone).toBe('+1555000');
   });
 
-  test('saveToAddressBook updates existing entry by name', () => {
+  test('saveToAddressBook updates existing entry by name', async () => {
     $('shipperName').value = 'Test Shipper';
     $('shipperPhone').value = '+1111';
-    call('saveToAddressBook', 'shipper');
+    await call('saveToAddressBook', 'shipper');
 
     $('shipperPhone').value = '+2222';
-    call('saveToAddressBook', 'shipper');
+    await call('saveToAddressBook', 'shipper');
 
     const book = call('getAddressBook');
     expect(book.length).toBe(1);
     expect(book[0].phone).toBe('+2222');
   });
 
-  test('loadFromAddressBook fills target party fields', () => {
+  test('loadFromAddressBook fills target party fields', async () => {
     $('shipperName').value = 'Saved Contact';
-    $('shipperAddr').value = '456 Saved Lane';
+    setPartyAddress('shipper', { address1: '456 Saved Lane', city: 'Johannesburg', country: 'ZA' });
     $('shipperPhone').value = '+999';
     $('shipperEmail').value = 'saved@test.com';
-    call('saveToAddressBook', 'shipper');
+    await call('saveToAddressBook', 'shipper');
 
     // Clear consignee
     $('consigneeName').value = '';
-    $('consigneeAddr').value = '';
+    setPartyAddress('consignee', { address1: '', city: '', country: '' });
 
     // Load to consignee
-    call('loadFromAddressBook', 0, 'consignee');
+    const contactId = call('getAddressBook')[0].id;
+    call('loadFromAddressBook', contactId, 'consignee');
     expect($('consigneeName').value).toBe('Saved Contact');
-    expect($('consigneeAddr').value).toBe('456 Saved Lane');
+    expect($('consigneeAddress1').value).toBe('456 Saved Lane');
+    expect($('consigneeCity').value).toBe('Johannesburg');
     expect($('consigneePhone').value).toBe('+999');
   });
 
-  test('deleteFromAddressBook removes an entry when confirmed', () => {
+  test('deleteFromAddressBook removes an entry when confirmed', async () => {
     $('shipperName').value = 'Delete Me';
-    $('shipperAddr').value = 'Somewhere';
-    call('saveToAddressBook', 'shipper');
+    setPartyAddress('shipper', { address1: 'Somewhere' });
+    await call('saveToAddressBook', 'shipper');
     expect(call('getAddressBook').length).toBe(1);
 
     env.window.confirm = () => true;
-    call('deleteFromAddressBook', 0);
+    const contactId = call('getAddressBook')[0].id;
+    await call('deleteFromAddressBook', contactId);
     expect(call('getAddressBook').length).toBe(0);
   });
 
-  test('deleteFromAddressBook preserves entry when cancelled', () => {
+  test('deleteFromAddressBook preserves entry when cancelled', async () => {
     $('shipperName').value = 'Keep Me';
-    $('shipperAddr').value = 'Somewhere';
-    call('saveToAddressBook', 'shipper');
+    setPartyAddress('shipper', { address1: 'Somewhere' });
+    await call('saveToAddressBook', 'shipper');
     expect(call('getAddressBook').length).toBe(1);
 
     env.window.confirm = () => false;
-    call('deleteFromAddressBook', 0);
+    const contactId = call('getAddressBook')[0].id;
+    await call('deleteFromAddressBook', contactId);
     expect(call('getAddressBook').length).toBe(1);
   });
 
-  test('saveToAddressBook ignores empty entries', () => {
+  test('saveToAddressBook ignores empty entries', async () => {
     $('shipperName').value = '';
-    $('shipperAddr').value = '';
-    call('saveToAddressBook', 'shipper');
+    setPartyAddress('shipper', { address1: '' });
+    await call('saveToAddressBook', 'shipper');
     expect(call('getAddressBook').length).toBe(0);
   });
 
-  test('saveToAddressBook for importer works', () => {
+  test('saveToAddressBook for importer works', async () => {
     $('importerName').value = 'Test Importer Co';
-    $('importerAddr').value = '789 Import Ave';
-    call('saveToAddressBook', 'importer');
+    setPartyAddress('importer', { address1: '789 Import Ave', postalCode: '2196', country: 'ZA' });
+    await call('saveToAddressBook', 'importer');
     const book = call('getAddressBook');
     expect(book.length).toBe(1);
     expect(book[0].name).toBe('Test Importer Co');
+    expect(book[0].role_hints).toContain('importer');
+  });
+
+  test('signed-out users cannot save contacts', async () => {
+    await enterSignedOutCloudMode();
+
+    $('shipperName').value = 'Blocked Contact';
+    setPartyAddress('shipper', { address1: 'No Save Road' });
+    await call('saveToAddressBook', 'shipper');
+
+    expect(call('getAddressBook')).toEqual([]);
+    const toast = env.document.querySelector('.toast');
+    expect(toast.textContent).toContain('Sign in');
+  });
+
+  test('editing a contact shows role toggles and only one edit form stays open', async () => {
+    $('shipperName').value = 'Contact One';
+    setPartyAddress('shipper', { address1: '1 Main St' });
+    await call('saveToAddressBook', 'shipper');
+
+    $('shipperName').value = 'Contact Two';
+    setPartyAddress('shipper', { address1: '2 Main St' });
+    await call('saveToAddressBook', 'shipper');
+
+    const contacts = call('getAddressBook');
+    call('editAddressBookEntry', contacts[0].id);
+    call('editAddressBookEntry', contacts[1].id);
+
+    const forms = env.document.querySelectorAll('.address-book-edit-form');
+    expect(forms.length).toBe(1);
+    expect(forms[0].textContent).toContain('Shipper');
+    expect(forms[0].textContent).toContain('Consignee');
+    expect(forms[0].textContent).toContain('Importer');
+  });
+
+  test('editing a contact tracks saved and unsaved state', async () => {
+    $('shipperName').value = 'Editable Contact';
+    setPartyAddress('shipper', { address1: '5 Draft Rd' });
+    await call('saveToAddressBook', 'shipper');
+
+    const contact = call('getAddressBook')[0];
+    call('editAddressBookEntry', contact.id);
+    expect(env.document.querySelector('.address-book-edit-status').textContent).toContain('Saved');
+
+    call('updateContactEditDraft', 'name', 'Editable Contact Updated');
+    expect(env.document.querySelector('.address-book-edit-status').textContent).toContain('Unsaved changes');
+  });
+
+  test('editing a contact can update role hints', async () => {
+    $('shipperName').value = 'Role Contact';
+    setPartyAddress('shipper', { address1: '7 Role St' });
+    await call('saveToAddressBook', 'shipper');
+
+    const contact = call('getAddressBook')[0];
+    call('editAddressBookEntry', contact.id);
+    call('toggleContactRoleHint', 'consignee', true);
+    await call('saveEditedEntry', contact.id);
+
+    const updated = call('getAddressBook')[0];
+    expect(updated.role_hints).toContain('shipper');
+    expect(updated.role_hints).toContain('consignee');
   });
 });
 
@@ -333,10 +427,11 @@ describe('Toast notifications', () => {
     expect(toast.textContent).toBe('Test message');
   });
 
-  test('saveToAddressBook triggers toast', () => {
+  test('saveToAddressBook triggers toast', async () => {
+    await signInCloudTest();
     $('shipperName').value = 'Toast Test';
-    $('shipperAddr').value = '123 Street';
-    call('saveToAddressBook', 'shipper');
+    setPartyAddress('shipper', { address1: '123 Street' });
+    await call('saveToAddressBook', 'shipper');
     const toast = env.document.querySelector('.toast');
     expect(toast).not.toBeNull();
     expect(toast.textContent).toContain('Toast Test');
@@ -347,7 +442,10 @@ describe('Toast notifications', () => {
 // Contact Pickers
 // ============================================================
 describe('Contact pickers', () => {
-  beforeEach(() => { call('setAddressBook', []); });
+  beforeEach(async () => {
+    call('setAddressBook', []);
+    await signInCloudTest();
+  });
 
   test('shipper picker exists', () => {
     expect($('shipperPicker')).not.toBeNull();
@@ -361,10 +459,10 @@ describe('Contact pickers', () => {
     expect($('importerPicker')).not.toBeNull();
   });
 
-  test('renderContactPickers populates pickers from address book', () => {
+  test('renderContactPickers populates pickers from address book', async () => {
     $('shipperName').value = 'Picker Test';
-    $('shipperAddr').value = '999 Lane';
-    call('saveToAddressBook', 'shipper');
+    setPartyAddress('shipper', { address1: '999 Lane' });
+    await call('saveToAddressBook', 'shipper');
     call('renderContactPickers');
     const picker = $('shipperPicker');
     // Default option + 1 contact
@@ -372,18 +470,19 @@ describe('Contact pickers', () => {
     expect(picker.options[1].textContent).toBe('Picker Test');
   });
 
-  test('pickContact loads entry into target fields', () => {
+  test('pickContact loads entry into target fields', async () => {
     $('shipperName').value = 'Pick Me';
-    $('shipperAddr').value = '100 Pick St';
+    setPartyAddress('shipper', { address1: '100 Pick St', city: 'Pretoria', country: 'ZA' });
     $('shipperPhone').value = '+111';
-    call('saveToAddressBook', 'shipper');
+    await call('saveToAddressBook', 'shipper');
     call('renderContactPickers');
 
     const picker = $('consigneePicker');
-    picker.value = '0';
+    picker.value = call('getAddressBook')[0].id;
     call('pickContact', picker, 'consignee');
     expect($('consigneeName').value).toBe('Pick Me');
-    expect($('consigneeAddr').value).toBe('100 Pick St');
+    expect($('consigneeAddress1').value).toBe('100 Pick St');
+    expect($('consigneeCity').value).toBe('Pretoria');
   });
 });
 
@@ -391,20 +490,23 @@ describe('Contact pickers', () => {
 // Address Book Search
 // ============================================================
 describe('Address book search', () => {
-  beforeEach(() => { call('setAddressBook', []); });
+  beforeEach(async () => {
+    call('setAddressBook', []);
+    await signInCloudTest();
+  });
 
   test('search input exists', () => {
     expect($('addressBookSearch')).not.toBeNull();
   });
 
-  test('search filters entries', () => {
+  test('search filters entries', async () => {
     // Add two contacts
     $('shipperName').value = 'Alice Smith';
-    $('shipperAddr').value = '1 Main St';
-    call('saveToAddressBook', 'shipper');
+    setPartyAddress('shipper', { address1: '1 Main St', city: 'Cape Town' });
+    await call('saveToAddressBook', 'shipper');
     $('shipperName').value = 'Bob Jones';
-    $('shipperAddr').value = '2 Oak Ave';
-    call('saveToAddressBook', 'shipper');
+    setPartyAddress('shipper', { address1: '2 Oak Ave', city: 'Durban' });
+    await call('saveToAddressBook', 'shipper');
     expect(call('getAddressBook').length).toBe(2);
 
     // Search for Alice
@@ -415,13 +517,13 @@ describe('Address book search', () => {
     expect(entries[0].textContent).toContain('Alice Smith');
   });
 
-  test('empty search shows all entries', () => {
+  test('empty search shows all entries', async () => {
     $('shipperName').value = 'Contact A';
-    $('shipperAddr').value = 'Addr A';
-    call('saveToAddressBook', 'shipper');
+    setPartyAddress('shipper', { address1: 'Addr A' });
+    await call('saveToAddressBook', 'shipper');
     $('shipperName').value = 'Contact B';
-    $('shipperAddr').value = 'Addr B';
-    call('saveToAddressBook', 'shipper');
+    setPartyAddress('shipper', { address1: 'Addr B' });
+    await call('saveToAddressBook', 'shipper');
 
     $('addressBookSearch').value = '';
     call('renderAddressBook');
@@ -434,34 +536,16 @@ describe('Address book search', () => {
 // Address Book Export/Import
 // ============================================================
 describe('Address book export/import', () => {
-  beforeEach(() => { call('setAddressBook', []); });
-
-  test('exportAddressBook function exists', () => {
-    expect(typeof env.window.exportAddressBook).toBe('function');
+  beforeEach(async () => {
+    call('setAddressBook', []);
+    await signInCloudTest();
   });
 
-  test('exportAddressBook toasts when empty', () => {
-    call('exportAddressBook');
+  test('exportAddressBook toasts when empty', async () => {
+    await call('exportAddressBook');
     const toast = env.document.querySelector('.toast');
     expect(toast).not.toBeNull();
     expect(toast.textContent).toContain('empty');
-  });
-
-  test('importAddressBook function exists', () => {
-    expect(typeof env.window.importAddressBook).toBe('function');
-  });
-});
-
-// ============================================================
-// Inline Edit
-// ============================================================
-describe('Address book inline edit', () => {
-  test('editAddressBookEntry function exists', () => {
-    expect(typeof env.window.editAddressBookEntry).toBe('function');
-  });
-
-  test('saveEditedEntry function exists', () => {
-    expect(typeof env.window.saveEditedEntry).toBe('function');
   });
 });
 
@@ -469,10 +553,6 @@ describe('Address book inline edit', () => {
 // PDF Download
 // ============================================================
 describe('PDF download', () => {
-  test('downloadPDF function exists', () => {
-    expect(typeof env.window.downloadPDF).toBe('function');
-  });
-
   test('downloadPDF alerts when libraries not loaded', () => {
     let alertMsg = null;
     env.window.alert = (msg) => { alertMsg = msg; };
@@ -485,64 +565,50 @@ describe('PDF download', () => {
 // Default Contact Info
 // ============================================================
 describe('Default contact info', () => {
-  test('shipper phone starts blank', () => {
+  test('shipper fields start blank', () => {
+    expect($('shipperName').value).toBe('');
     expect($('shipperPhone').value).toBe('');
-  });
-
-  test('shipper email starts blank', () => {
     expect($('shipperEmail').value).toBe('');
   });
 
-  test('consignee phone starts blank', () => {
+  test('consignee fields start blank', () => {
+    expect($('consigneeName').value).toBe('');
     expect($('consigneePhone').value).toBe('');
-  });
-
-  test('consignee email starts blank', () => {
     expect($('consigneeEmail').value).toBe('');
   });
 
-  test('importer name starts blank', () => {
+  test('importer fields start blank', () => {
     expect($('importerName').value).toBe('');
-  });
-
-  test('importer email starts blank', () => {
     expect($('importerEmail').value).toBe('');
-  });
-
-  test('importer VAT ID starts blank', () => {
     expect($('importerTaxId').value).toBe('');
   });
 });
 
 // ============================================================
-// Seeded Address Book
+// Cloud Address Book Defaults
 // ============================================================
-describe('Seeded address book', () => {
-  test('address book is seeded with 3 default contacts', () => {
+describe('Cloud address book defaults', () => {
+  test('address book starts with no seeded contacts', () => {
     const book = call('getAddressBook');
-    expect(book.length).toBe(3);
+    expect(book).toEqual([]);
   });
 
-  test('Default Importer is in the address book', () => {
-    const book = call('getAddressBook');
-    const importer = book.find(c => c.name === 'Default Importer');
-    expect(importer).toBeDefined();
-    expect(importer.email).toBe('importer@example.com');
-    expect(importer.taxId).toBe('VAT-000');
+  test('local mode keeps the address book enabled without sign-in', () => {
+    expect($('addressBookSearch').disabled).toBe(false);
+    expect($('shipperPicker').disabled).toBe(false);
+    expect(env.document.querySelector('#addressBookList').textContent).toContain('No saved contacts');
   });
 
-  test('Default Shipper is in the address book', () => {
-    const book = call('getAddressBook');
-    const shipper = book.find(c => c.name === 'Default Shipper');
-    expect(shipper).toBeDefined();
-    expect(shipper.phone).toBe('+10000000001');
+  test('local mode shows a saved locally indicator', () => {
+    expect($('localSaveIndicator').classList.contains('section-hidden')).toBe(false);
+    expect($('localSaveIndicator').textContent).toContain('saved locally');
   });
 
-  test('Default Consignee is in the address book', () => {
-    const book = call('getAddressBook');
-    const consignee = book.find(c => c.name === 'Default Consignee');
-    expect(consignee).toBeDefined();
-    expect(consignee.phone).toBe('+10000000002');
+  test('configured cloud mode disables the address book while signed out', async () => {
+    await enterSignedOutCloudMode();
+    expect($('addressBookSearch').disabled).toBe(true);
+    expect($('shipperPicker').disabled).toBe(true);
+    expect(env.document.querySelector('#addressBookList').textContent).toContain('Sign in');
   });
 });
 
@@ -554,19 +620,112 @@ describe('Product panel', () => {
     expect(env.document.getElementById('productsPanel')).not.toBeNull();
   });
 
-  test('renderProductPanel function exists', () => {
-    expect(typeof env.window.renderProductPanel).toBe('function');
+  test('togglePanel opens and closeAllPanels closes', () => {
+    call('togglePanel', 'productsPanel');
+    expect(env.document.getElementById('productsPanel').classList.contains('open')).toBe(true);
+    call('closeAllPanels');
+    expect(env.document.getElementById('productsPanel').classList.contains('open')).toBe(false);
+  });
+});
+
+// ============================================================
+// Company Profile
+// ============================================================
+describe('Company profile', () => {
+  beforeEach(async () => {
+    await signInCloudTest();
   });
 
-  test('addProductFromPanel function exists', () => {
-    expect(typeof env.window.addProductFromPanel).toBe('function');
+  test('saveCompanyProfile stores shipper defaults and can apply them to the invoice', async () => {
+    $('profileName').value = 'Acme Exports';
+    $('profileAddress1').value = '1 Export Way';
+    $('profileCity').value = 'Johannesburg';
+    $('profileCountry').value = 'ZA';
+    $('profilePhone').value = '+12345';
+    $('profileEmail').value = 'ops@acme.test';
+    $('profileTaxId').value = 'VAT-123';
+
+    await call('saveCompanyProfile');
+    call('newInvoice');
+
+    expect($('shipperName').value).toBe('Acme Exports');
+    expect($('shipperAddress1').value).toBe('1 Export Way');
+    expect($('shipperCity').value).toBe('Johannesburg');
+    expect($('shipperPhone').value).toBe('+12345');
   });
 
-  test('togglePanel function exists', () => {
-    expect(typeof env.window.togglePanel).toBe('function');
+  test('clearSavedCompanyProfile removes stored defaults', async () => {
+    $('profileName').value = 'Acme Exports';
+    $('profileAddress1').value = '1 Export Way';
+    await call('saveCompanyProfile');
+    await call('clearSavedCompanyProfile');
+
+    call('newInvoice');
+    expect($('shipperName').value).toBe('');
+    expect($('profileName').value).toBe('');
   });
 
-  test('closeAllPanels function exists', () => {
-    expect(typeof env.window.closeAllPanels).toBe('function');
+  test('company profile can link to a contact and stay in sync when enabled', async () => {
+    $('shipperName').value = 'Linked Exporter';
+    $('shipperAddress1').value = '1 Sync Road';
+    $('shipperCity').value = 'Centurion';
+    $('shipperCountry').value = 'ZA';
+    await call('saveToAddressBook', 'shipper');
+
+    const repo = call('getRepo');
+    const [contact] = await repo.listContacts();
+    $('profileContactPicker').value = contact.id;
+    call('handleProfileContactChange');
+    $('profileSyncWithContact').checked = true;
+    call('handleProfileSyncToggle');
+    await call('saveCompanyProfile');
+
+    await repo.upsertContact({
+      id: contact.id,
+      name: 'Linked Exporter Updated',
+      address1: '9 Updated Lane',
+      city: 'Johannesburg',
+      country: 'ZA',
+      phone: '+27110000000',
+      email: 'sync@example.com',
+      taxId: 'VAT-999',
+      role_hints: ['shipper']
+    });
+
+    expect($('profileName').value).toBe('Linked Exporter Updated');
+    expect($('profileAddress1').value).toBe('9 Updated Lane');
+    expect($('profileCity').value).toBe('Johannesburg');
+
+    call('newInvoice');
+    expect($('shipperName').value).toBe('Linked Exporter Updated');
+    expect($('shipperAddress1').value).toBe('9 Updated Lane');
+  });
+
+  test('company profile keeps its own values when linked contact sync is off', async () => {
+    $('shipperName').value = 'Standalone Exporter';
+    $('shipperAddress1').value = '5 Profile Ave';
+    $('shipperCity').value = 'Cape Town';
+    $('shipperCountry').value = 'ZA';
+    await call('saveToAddressBook', 'shipper');
+
+    const repo = call('getRepo');
+    const [contact] = await repo.listContacts();
+    $('profileContactPicker').value = contact.id;
+    call('handleProfileContactChange');
+    $('profileSyncWithContact').checked = false;
+    $('profileName').value = 'Manual Profile Name';
+    await call('saveCompanyProfile');
+
+    await repo.upsertContact({
+      id: contact.id,
+      name: 'Changed Contact Name',
+      address1: '99 Changed Street',
+      city: 'Durban',
+      country: 'ZA',
+      role_hints: ['shipper']
+    });
+
+    expect($('profileName').value).toBe('Manual Profile Name');
+    expect($('profileAddress1').value).toBe('5 Profile Ave');
   });
 });

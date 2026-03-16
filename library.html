@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Library - Invoice Generator</title>
+  <link rel="stylesheet" href="css/invoice.css?v=6.2" />
+</head>
+<body data-view="library">
+  <div class="bar">
+    <div class="toolbar">
+      <strong>Library</strong>
+      <div class="actions">
+        <a class="btn nav-btn" href="index.html">Invoice</a>
+        <button class="btn" id="settingsToggleBtn" onclick="togglePanel('settingsPanel')">Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-overlay" id="settingsOverlay" onclick="closeAllPanels()"></div>
+
+  <div class="side-panel" id="settingsPanel">
+    <div class="side-panel-inner">
+      <h3>Settings <button class="panel-close" onclick="closeAllPanels()" title="Close">&times;</button></h3>
+      <div class="settings-group">
+        <h4>Appearance</h4>
+        <div class="address-book-controls">
+          <button class="btn" id="themeToggle" onclick="toggleTheme()">Dark</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <main class="stage">
+    <div class="invoice-wrap library-page">
+      <div class="library-grid">
+        <section class="library-section">
+          <h1>Contacts</h1>
+          <div class="auth-card">
+            <div class="auth-status" id="authStatus">Library sign-in required.</div>
+            <div class="status-note" id="cloudConfigNote">Set `window.APP_CONFIG` with your Supabase URL and anon key to enable cloud sync.</div>
+            <div class="party-row" id="authFields">
+              <label class="field"><span class="label">Email</span><input id="authEmail" type="email" autocomplete="username" /></label>
+              <label class="field"><span class="label">Password</span><input id="authPassword" type="password" autocomplete="current-password" /></label>
+            </div>
+            <div class="address-book-controls" id="authActions">
+              <button class="btn" id="signInBtn" onclick="signInAddressBook()">Sign In</button>
+              <button class="btn" id="signUpBtn" onclick="signUpAddressBook()">Create Account</button>
+              <button class="btn" id="signOutBtn" onclick="signOutAddressBook()">Sign Out</button>
+              <button class="btn" id="syncContactsBtn" onclick="syncAddressBook()">Sync Library</button>
+            </div>
+            <div class="status-note" id="syncStatus">Offline cache ready.</div>
+            <div class="local-save-indicator section-hidden" id="localSaveIndicator">Contacts and products are saved locally in this browser</div>
+          </div>
+
+          <div class="migration-banner section-hidden" id="migrationBanner">
+            <div class="migration-copy">Local contacts from an older version were found in this browser.</div>
+            <div class="address-book-controls">
+              <button class="btn" onclick="importLegacyLocalContacts()">Import Local Contacts</button>
+              <button class="btn" onclick="dismissLegacyMigration()">Dismiss</button>
+            </div>
+          </div>
+
+          <div class="address-book-controls">
+            <button class="btn" data-contact-action="true" onclick="startNewContact()">New Contact</button>
+            <button class="btn" data-contact-action="true" onclick="exportAddressBook()">Export Backup</button>
+            <button class="btn" data-contact-action="true" onclick="importAddressBook()">Import Backup</button>
+            <button class="btn section-hidden" data-contact-action="true" id="loadSampleContactsBtn" onclick="loadSampleContacts()">Load Sample Data</button>
+          </div>
+
+          <input type="text" id="addressBookSearch" class="address-book-search" placeholder="Search contacts..." oninput="renderAddressBook()" />
+          <div id="addressBookList" class="address-book-list"></div>
+        </section>
+
+        <section class="library-section">
+          <h1>Products</h1>
+          <div class="address-book-controls">
+            <button class="btn" data-product-action="true" onclick="startNewProduct()">New Product</button>
+          </div>
+          <input type="text" id="productSearch" class="product-search" placeholder="Search products..." oninput="renderProductPanel()" />
+          <div id="productPanelList"></div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <script src="js/catalogue.js?v=5.3"></script>
+  <script src="js/app-config.js?v=6.2"></script>
+  <script src="js/address-book-service.js?v=6.6"></script>
+  <script src="js/invoice.js?v=6.4"></script>
+</body>
+</html>
