@@ -13,8 +13,25 @@ const THEME_KEY     = 'invoice_theme';
 const MAX_HISTORY   = 50;
 
 const LEGACY_KEYS = ['invoice_v3', 'invoice_pro_state_v2_no_vat', 'invoice_state'];
+const SETTINGS_KEY = 'invoice_settings';
+const ADDRESSBOOK_KEY = 'invoice_addressbook';
 
 const UOM_OPTIONS = ['pcs', 'kg', 'set', 'pair', 'box', 'unit'];
+
+// Toggle IDs mapped to the DOM elements/classes they control
+const VISIBILITY_MAP = {
+  togShipmentRef:     { field: 'shipmentRef', type: 'field' },
+  togIncoterms:       { field: 'incoterms', type: 'field' },
+  togReasonForExport: { field: 'reasonForExport', type: 'field' },
+  togImporter:        { id: 'importerSection' },
+  togShipmentDetails: { id: 'shipmentDetailsSection' },
+  togUom:             { col: 4, headerClass: 'col-uom' },
+  togOrigin:          { col: 6, headerClass: 'col-origin' },
+  togWeight:          { col: 7, headerClass: 'col-weight' },
+  togShippingCost:    { id: 'shippingCostRow' },
+  togInsurance:       { id: 'insuranceRow' },
+  togDeclaration:     { id: 'declarationSection' }
+};
 
 // --- B: Utilities ---
 function escapeHtml(s) {
@@ -147,6 +164,7 @@ function addRow({ qty, desc, hs, unit, sku, uom, origin, weight }) {
 
   items.appendChild(row);
   recalcTotals();
+  applyVisibility();
   saveState();
 }
 
@@ -233,14 +251,23 @@ function buildPrintBlock() {
   partiesHtml += buildPrintParty('Consignee / Receiver', st.parties.consignee);
   partiesHtml += '</div>';
 
-  if (st.parties.importer && st.parties.importer.name && !st.parties.importer.sameAsConsignee) {
+  const togImporter = $('togImporter');
+  const showImporter = !togImporter || togImporter.checked;
+  if (showImporter && st.parties.importer && st.parties.importer.name && !st.parties.importer.sameAsConsignee) {
     partiesHtml += '<div class="print-parties">';
     partiesHtml += buildPrintParty('Importer of Record', st.parties.importer);
     partiesHtml += '</div>';
   }
 
+  // Visibility checks for print
+  const showUom = !$('togUom') || $('togUom').checked;
+  const showOrigin = !$('togOrigin') || $('togOrigin').checked;
+  const showWeight = !$('togWeight') || $('togWeight').checked;
+  const showShipDetails = !$('togShipmentDetails') || $('togShipmentDetails').checked;
+  const showDecl = !$('togDeclaration') || $('togDeclaration').checked;
+
   // Shipment details
-  const shipHtml = `<div class="print-shipment">
+  const shipHtml = !showShipDetails ? '' : `<div class="print-shipment">
     <strong>Origin:</strong> ${escapeHtml(st.shipment.defaultOrigin)}
     &nbsp; <strong>Weight:</strong> ${st.shipment.totalWeight} kg
     &nbsp; <strong>Packages:</strong> ${escapeHtml(st.shipment.numPackages)}
@@ -248,19 +275,18 @@ function buildPrintBlock() {
     &nbsp; <strong>Carrier:</strong> ${escapeHtml(st.shipment.carrier)}
     &nbsp; <strong>Incoterms:</strong> ${escapeHtml(st.meta.incoterms)}
     &nbsp; <strong>Reason:</strong> ${escapeHtml(st.meta.reasonForExport)}
-  </div>`;
+  </div>`
 
-  // Items table
-  let tableHtml = `<table>
-    <thead><tr>
+  // Items table — respect column visibility
+  let tableHtml = `<table><thead><tr>
       <th style="width:4%">#</th>
       <th style="width:5%">Qty</th>
       <th>Description</th>
       <th style="width:10%">HS Code</th>
-      <th style="width:6%">UoM</th>
+      ${showUom ? '<th style="width:6%">UoM</th>' : ''}
       <th style="width:10%">Unit (${escapeHtml(cur)})</th>
-      <th style="width:5%">CoO</th>
-      <th style="width:7%">Wt (kg)</th>
+      ${showOrigin ? '<th style="width:5%">CoO</th>' : ''}
+      ${showWeight ? '<th style="width:7%">Wt (kg)</th>' : ''}
       <th style="width:11%">Total</th>
     </tr></thead><tbody>`;
 
@@ -271,10 +297,10 @@ function buildPrintBlock() {
       <td style="text-align:right">${item.qty}</td>
       <td>${escapeHtml(item.desc)}</td>
       <td>${escapeHtml(item.hs)}</td>
-      <td style="text-align:center">${escapeHtml(item.uom)}</td>
+      ${showUom ? '<td style="text-align:center">' + escapeHtml(item.uom) + '</td>' : ''}
       <td style="text-align:right">${fmt(item.unit)}</td>
-      <td style="text-align:center">${escapeHtml(item.origin)}</td>
-      <td style="text-align:right">${fmt(item.weight)}</td>
+      ${showOrigin ? '<td style="text-align:center">' + escapeHtml(item.origin) + '</td>' : ''}
+      ${showWeight ? '<td style="text-align:right">' + fmt(item.weight) + '</td>' : ''}
       <td style="text-align:right">${fmt(line)}</td>
     </tr>`;
   });
@@ -289,7 +315,7 @@ function buildPrintBlock() {
   </div>`;
 
   // Declaration
-  const declHtml = `<div class="print-declaration">
+  const declHtml = !showDecl ? '' : `<div class="print-declaration">
     <p>I/We hereby declare that the information on this invoice is true and correct
     and that the contents of this shipment are as stated above.</p>
     <div class="print-sig-row">
@@ -672,10 +698,172 @@ function newInvoice() {
   saveState();
 }
 
-// --- N: Event Bindings & Initialization ---
+// --- N: Settings & Visibility ---
+function toggleSettingsPanel() {
+  const panel = $('settingsPanel');
+  if (!panel) return;
+  panel.classList.toggle('open');
+}
+
+function getSettings() {
+  const settings = {};
+  Object.keys(VISIBILITY_MAP).forEach(togId => {
+    const el = $(togId);
+    if (el) settings[togId] = el.checked;
+  });
+  return settings;
+}
+
+function saveSettings() {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(getSettings()));
+  } catch (e) {}
+}
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (!raw) return;
+    const settings = JSON.parse(raw);
+    Object.keys(settings).forEach(togId => {
+      const el = $(togId);
+      if (el) el.checked = !!settings[togId];
+    });
+  } catch (e) {}
+}
+
+function applyVisibility() {
+  // Field-level toggles (meta fields like shipmentRef, incoterms, reasonForExport)
+  Object.keys(VISIBILITY_MAP).forEach(togId => {
+    const el = $(togId);
+    if (!el) return;
+    const show = el.checked;
+    const map = VISIBILITY_MAP[togId];
+
+    // Section by ID
+    if (map.id) {
+      const section = $(map.id);
+      if (section) {
+        if (show) section.classList.remove('section-hidden');
+        else section.classList.add('section-hidden');
+      }
+    }
+
+    // Individual field (wrapped in label.field)
+    if (map.field) {
+      const field = $(map.field);
+      if (field) {
+        const wrapper = field.closest('.field');
+        if (wrapper) {
+          if (show) wrapper.classList.remove('section-hidden');
+          else wrapper.classList.add('section-hidden');
+        }
+      }
+    }
+
+    // Grid column toggles (UoM, Origin, Weight)
+    if (map.col !== undefined) {
+      const colIdx = map.col;
+      // Header cells
+      const headCells = document.querySelectorAll('.head.gridCols > div');
+      if (headCells[colIdx]) {
+        if (show) headCells[colIdx].classList.remove('section-hidden');
+        else headCells[colIdx].classList.add('section-hidden');
+      }
+      // Row cells
+      document.querySelectorAll('#items [data-row]').forEach(row => {
+        const cells = row.querySelectorAll('.cell');
+        if (cells[colIdx]) {
+          if (show) cells[colIdx].classList.remove('section-hidden');
+          else cells[colIdx].classList.add('section-hidden');
+        }
+      });
+    }
+  });
+
+  saveSettings();
+}
+
+// --- O: Address Book ---
+function getAddressBook() {
+  try {
+    const raw = localStorage.getItem(ADDRESSBOOK_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) { return []; }
+}
+
+function setAddressBook(book) {
+  try {
+    localStorage.setItem(ADDRESSBOOK_KEY, JSON.stringify(book));
+  } catch (e) {}
+}
+
+function saveToAddressBook(prefix) {
+  const party = readPartyFields(prefix);
+  if (!party.name && !party.address) return;
+
+  const book = getAddressBook();
+  // Check for duplicate by name
+  const existing = book.findIndex(e => e.name === party.name);
+  if (existing >= 0) {
+    book[existing] = party;
+  } else {
+    book.push(party);
+  }
+  setAddressBook(book);
+  renderAddressBook();
+}
+
+function loadFromAddressBook(index, target) {
+  const book = getAddressBook();
+  const entry = book[index];
+  if (!entry) return;
+  writePartyFields(target, entry);
+  saveState();
+}
+
+function deleteFromAddressBook(index, event) {
+  if (event) event.stopPropagation();
+  const book = getAddressBook();
+  book.splice(index, 1);
+  setAddressBook(book);
+  renderAddressBook();
+}
+
+function renderAddressBook() {
+  const list = $('addressBookList');
+  if (!list) return;
+  const book = getAddressBook();
+
+  if (!book.length) {
+    list.innerHTML = '<div class="history-empty">No saved addresses</div>';
+    return;
+  }
+
+  list.innerHTML = book.map((entry, i) => {
+    const detail = [entry.phone, entry.email].filter(Boolean).join(' | ');
+    return `<div class="address-book-entry">
+      <div class="address-book-entry-info">
+        <div class="address-book-entry-name">${escapeHtml(entry.name || 'No name')}</div>
+        ${detail ? '<div class="address-book-entry-detail">' + escapeHtml(detail) + '</div>' : ''}
+      </div>
+      <div class="address-book-entry-actions">
+        <button onclick="loadFromAddressBook(${i}, 'shipper')" title="Load as Shipper">Shipper</button>
+        <button onclick="loadFromAddressBook(${i}, 'consignee')" title="Load as Consignee">Consignee</button>
+        <button onclick="loadFromAddressBook(${i}, 'importer')" title="Load as Importer">Importer</button>
+        <button onclick="deleteFromAddressBook(${i}, event)" title="Delete">Del</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// --- P: Event Bindings & Initialization ---
 function init() {
   loadTheme();
   populateProductDropdown();
+  loadSettings();
+  applyVisibility();
+  renderAddressBook();
 
   // Auto-save on all form field edits
   const autoSaveFields = [

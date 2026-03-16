@@ -337,6 +337,87 @@ h3 {
   text-align: center;
 }
 
+/* --- Settings Panel --- */
+.settings-panel {
+  display: none;
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--border);
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.25s ease;
+}
+.settings-panel.open {
+  display: block;
+  max-height: 600px;
+  overflow-y: auto;
+}
+.settings-inner {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 10px 8px;
+}
+.settings-inner h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+.settings-group {
+  margin-bottom: 10px;
+}
+.settings-group h4 {
+  margin: 0 0 6px;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  padding: 3px 0;
+  cursor: pointer;
+}
+.toggle-row input[type="checkbox"] {
+  width: auto;
+  height: auto;
+  margin: 0;
+}
+.section-hidden { display: none !important; }
+
+/* --- Address Book --- */
+.address-book-controls {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.address-book-list {
+  font-size: 11px;
+}
+.address-book-entry {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+.address-book-entry:hover { background: var(--history-hover); }
+.address-book-entry-info { flex: 1; }
+.address-book-entry-name { font-weight: bold; }
+.address-book-entry-detail { color: var(--muted); font-size: 10px; }
+.address-book-entry-actions {
+  display: flex;
+  gap: 4px;
+}
+.address-book-entry-actions button {
+  border: none;
+  background: transparent;
+  color: var(--del-color);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 2px 4px;
+}
+
 /* --- Responsive --- */
 @media (max-width: 480px) {
   .meta { grid-template-columns: 1fr 1fr; }
@@ -363,7 +444,7 @@ h3 {
     background: transparent !important;
   }
 
-  .bar, .controls, .history-wrap { display: none !important; }
+  .bar, .controls, .history-wrap, .settings-panel { display: none !important; }
   .invoice-wrap { max-width: none; }
   .itemsWrap { display: none !important; }
   .totals { display: none !important; }

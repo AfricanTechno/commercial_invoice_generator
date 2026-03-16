@@ -1,0 +1,20 @@
+{
+  "name": "invoicegenerator",
+  "version": "1.0.0",
+  "description": "A lightweight web app for creating, editing, and printing customs-compliant commercial invoices compatible with DHL, FedEx, UPS, and Aramex. No frameworks, no build tools — just open `index.html` in a browser.",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest --verbose"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "transformIgnorePatterns": []
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "jsdom": "^24.1.3"
+  }
+}

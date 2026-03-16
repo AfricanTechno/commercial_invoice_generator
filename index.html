@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Commercial Invoice</title>
-  <link rel="stylesheet" href="css/invoice.css" />
+  <link rel="stylesheet" href="css/invoice.css?v=4.1" />
 </head>
 <body>
 
@@ -28,6 +28,36 @@
           <option value="">+ Add product...</option>
         </select>
         <button class="btn" onclick="addProduct()">Add</button>
+      </div>
+      <button class="btn" id="settingsToggleBtn" onclick="toggleSettingsPanel()">Settings</button>
+    </div>
+  </div>
+
+  <!-- Settings Panel -->
+  <div class="settings-panel" id="settingsPanel">
+    <div class="settings-inner">
+      <h3>Settings</h3>
+      <div class="settings-group">
+        <h4>Show / Hide Sections</h4>
+        <label class="toggle-row"><input type="checkbox" id="togShipmentRef" checked onchange="applyVisibility()" /> Shipment Reference</label>
+        <label class="toggle-row"><input type="checkbox" id="togIncoterms" checked onchange="applyVisibility()" /> Incoterms</label>
+        <label class="toggle-row"><input type="checkbox" id="togReasonForExport" checked onchange="applyVisibility()" /> Reason for Export</label>
+        <label class="toggle-row"><input type="checkbox" id="togImporter" checked onchange="applyVisibility()" /> Importer of Record</label>
+        <label class="toggle-row"><input type="checkbox" id="togShipmentDetails" checked onchange="applyVisibility()" /> Shipment Details</label>
+        <label class="toggle-row"><input type="checkbox" id="togUom" checked onchange="applyVisibility()" /> Unit of Measure Column</label>
+        <label class="toggle-row"><input type="checkbox" id="togOrigin" checked onchange="applyVisibility()" /> Country of Origin Column</label>
+        <label class="toggle-row"><input type="checkbox" id="togWeight" checked onchange="applyVisibility()" /> Weight Column</label>
+        <label class="toggle-row"><input type="checkbox" id="togShippingCost" checked onchange="applyVisibility()" /> Shipping Cost</label>
+        <label class="toggle-row"><input type="checkbox" id="togInsurance" checked onchange="applyVisibility()" /> Insurance</label>
+        <label class="toggle-row"><input type="checkbox" id="togDeclaration" checked onchange="applyVisibility()" /> Declaration</label>
+      </div>
+      <div class="settings-group">
+        <h4>Address Book</h4>
+        <div class="address-book-controls">
+          <button class="btn" onclick="saveToAddressBook('shipper')">Save Shipper</button>
+          <button class="btn" onclick="saveToAddressBook('consignee')">Save Consignee</button>
+        </div>
+        <div id="addressBookList" class="address-book-list"></div>
       </div>
     </div>
   </div>
@@ -95,7 +125,7 @@
           <label class="field"><span class="label">Tax / VAT ID</span><input id="consigneeTaxId" /></label>
         </div>
 
-        <div class="party importer-party">
+        <div class="party importer-party" id="importerSection">
           <h3>
             Importer of Record
             <label class="same-check"><input type="checkbox" id="importerSameAsConsignee" onclick="toggleImporterSame()" /> Same as Consignee</label>
@@ -111,7 +141,7 @@
       </div>
 
       <!-- 3. Shipment Details -->
-      <div class="shipment-details">
+      <div class="shipment-details" id="shipmentDetailsSection">
         <label class="field"><span class="label">Default Origin</span><input id="defaultOrigin" value="US" /></label>
         <label class="field"><span class="label">Total Weight (kg)</span><input id="totalWeight" value="0.00" readonly /></label>
         <label class="field"><span class="label">No. of Packages</span><input id="numPackages" value="1" inputmode="numeric" /></label>
@@ -156,11 +186,11 @@
             <span>Subtotal</span>
             <span id="subtotal">0.00</span>
           </div>
-          <div class="totalRow">
+          <div class="totalRow" id="shippingCostRow">
             <span>Shipping Cost</span>
             <input id="shippingCost" value="0.00" inputmode="decimal" />
           </div>
-          <div class="totalRow">
+          <div class="totalRow" id="insuranceRow">
             <span>Insurance</span>
             <input id="insurance" value="0.00" inputmode="decimal" />
           </div>
@@ -172,7 +202,7 @@
       </div>
 
       <!-- 6. Declaration -->
-      <div class="declaration">
+      <div class="declaration" id="declarationSection">
         <h3>Declaration</h3>
         <p>I/We hereby declare that the information on this invoice is true and correct
         and that the contents of this shipment are as stated above.</p>
@@ -188,7 +218,7 @@
     </div>
   </main>
 
-  <script src="js/catalogue.js"></script>
-  <script src="js/invoice.js"></script>
+  <script src="js/catalogue.js?v=4.1"></script>
+  <script src="js/invoice.js?v=4.1"></script>
 </body>
 </html>
