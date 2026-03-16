@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Commercial Invoice</title>
-  <link rel="stylesheet" href="css/invoice.css?v=5.0" />
+  <link rel="stylesheet" href="css/invoice.css?v=5.1" />
 </head>
 <body>
 
@@ -60,7 +60,13 @@
         <div class="address-book-controls">
           <button class="btn" onclick="saveToAddressBook('shipper')">Save Shipper</button>
           <button class="btn" onclick="saveToAddressBook('consignee')">Save Consignee</button>
+          <button class="btn" onclick="saveToAddressBook('importer')">Save Importer</button>
         </div>
+        <div class="address-book-controls">
+          <button class="btn" onclick="exportAddressBook()">Export Contacts</button>
+          <button class="btn" onclick="importAddressBook()">Import Contacts</button>
+        </div>
+        <input type="text" id="addressBookSearch" class="address-book-search" placeholder="Search contacts..." oninput="renderAddressBook()" />
         <div id="addressBookList" class="address-book-list"></div>
       </div>
     </div>
@@ -108,7 +114,7 @@
       <!-- 2. Parties -->
       <div class="parties">
         <div class="party">
-          <h3>Shipper / Exporter</h3>
+          <h3>Shipper / Exporter <select class="contact-picker" id="shipperPicker" onchange="pickContact(this, 'shipper')"><option value="">Load contact...</option></select></h3>
           <label class="field"><span class="label">Company / Name</span><input id="shipperName" /></label>
           <label class="field"><span class="label">Address</span><textarea id="shipperAddr"></textarea></label>
           <div class="party-row">
@@ -119,7 +125,7 @@
         </div>
 
         <div class="party">
-          <h3>Consignee / Receiver</h3>
+          <h3>Consignee / Receiver <select class="contact-picker" id="consigneePicker" onchange="pickContact(this, 'consignee')"><option value="">Load contact...</option></select></h3>
           <label class="field"><span class="label">Company / Name</span><input id="consigneeName" /></label>
           <label class="field"><span class="label">Address</span><textarea id="consigneeAddr"></textarea></label>
           <div class="party-row">
@@ -132,6 +138,7 @@
         <div class="party importer-party" id="importerSection">
           <h3>
             Importer of Record
+            <select class="contact-picker" id="importerPicker" onchange="pickContact(this, 'importer')"><option value="">Load contact...</option></select>
             <label class="same-check"><input type="checkbox" id="importerSameAsConsignee" onclick="toggleImporterSame()" /> Same as Consignee</label>
           </h3>
           <label class="field"><span class="label">Company / Name</span><input id="importerName" /></label>
@@ -224,7 +231,7 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
-  <script src="js/catalogue.js?v=5.0"></script>
-  <script src="js/invoice.js?v=5.0"></script>
+  <script src="js/catalogue.js?v=5.1"></script>
+  <script src="js/invoice.js?v=5.1"></script>
 </body>
 </html>

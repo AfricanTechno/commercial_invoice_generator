@@ -51,6 +51,15 @@ function downloadFile(name, type, data) {
   setTimeout(() => URL.revokeObjectURL(a.href), 1500);
 }
 
+function showToast(message) {
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = message;
+  document.body.appendChild(el);
+  setTimeout(() => el.classList.add('toast-fade'), 1800);
+  setTimeout(() => el.remove(), 2200);
+}
+
 function todayStr() {
   const d = new Date();
   const dd = String(d.getDate()).padStart(2, '0');
@@ -884,7 +893,6 @@ function saveToAddressBook(prefix) {
   if (!party.name && !party.address) return;
 
   const book = getAddressBook();
-  // Check for duplicate by name
   const existing = book.findIndex(e => e.name === party.name);
   if (existing >= 0) {
     book[existing] = party;
@@ -893,6 +901,7 @@ function saveToAddressBook(prefix) {
   }
   setAddressBook(book);
   renderAddressBook();
+  showToast('Saved "' + (party.name || 'contact') + '" to address book');
 }
 
 function loadFromAddressBook(index, target) {
@@ -901,14 +910,19 @@ function loadFromAddressBook(index, target) {
   if (!entry) return;
   writePartyFields(target, entry);
   saveState();
+  showToast('Loaded "' + (entry.name || 'contact') + '" as ' + target);
 }
 
 function deleteFromAddressBook(index, event) {
   if (event) event.stopPropagation();
   const book = getAddressBook();
+  if (!book[index]) return;
+  var name = book[index].name || 'this contact';
+  if (!confirm('Delete "' + name + '" from address book?')) return;
   book.splice(index, 1);
   setAddressBook(book);
   renderAddressBook();
+  showToast('Deleted "' + name + '" from address book');
 }
 
 function renderAddressBook() {
@@ -916,13 +930,25 @@ function renderAddressBook() {
   if (!list) return;
   const book = getAddressBook();
 
-  if (!book.length) {
-    list.innerHTML = '<div class="history-empty">No saved addresses</div>';
+  // Search/filter
+  const searchEl = $('addressBookSearch');
+  const search = searchEl ? (searchEl.value || '').toLowerCase() : '';
+  const entries = book.map((entry, i) => ({ ...entry, _idx: i }));
+  const filtered = search
+    ? entries.filter(e => [e.name, e.address, e.email, e.phone, e.taxId]
+        .some(f => (f || '').toLowerCase().includes(search)))
+    : entries;
+
+  if (!filtered.length) {
+    list.innerHTML = '<div class="history-empty">' + (search ? 'No matching contacts' : 'No saved addresses') + '</div>';
+    renderContactPickers();
     return;
   }
 
-  list.innerHTML = book.map((entry, i) => {
-    const detail = [entry.phone, entry.email].filter(Boolean).join(' | ');
+  list.innerHTML = filtered.map(entry => {
+    const i = entry._idx;
+    const addrPreview = (entry.address || '').split('\n')[0];
+    const detail = [addrPreview, entry.phone, entry.email].filter(Boolean).join(' | ');
     return `<div class="address-book-entry">
       <div class="address-book-entry-info">
         <div class="address-book-entry-name">${escapeHtml(entry.name || 'No name')}</div>
@@ -932,10 +958,133 @@ function renderAddressBook() {
         <button onclick="loadFromAddressBook(${i}, 'shipper')" title="Load as Shipper">Shipper</button>
         <button onclick="loadFromAddressBook(${i}, 'consignee')" title="Load as Consignee">Consignee</button>
         <button onclick="loadFromAddressBook(${i}, 'importer')" title="Load as Importer">Importer</button>
+        <button onclick="editAddressBookEntry(${i})" title="Edit">Edit</button>
         <button onclick="deleteFromAddressBook(${i}, event)" title="Delete">Del</button>
       </div>
     </div>`;
   }).join('');
+
+  renderContactPickers();
+}
+
+// --- O2: Contact Pickers (quick-access on party cards) ---
+function renderContactPickers() {
+  const book = getAddressBook();
+  ['shipperPicker', 'consigneePicker', 'importerPicker'].forEach(id => {
+    const sel = $(id);
+    if (!sel) return;
+    // Preserve only the first default option
+    while (sel.options.length > 1) sel.remove(1);
+    book.forEach((entry, i) => {
+      const o = document.createElement('option');
+      o.value = String(i);
+      o.textContent = entry.name || entry.email || 'Contact ' + (i + 1);
+      sel.appendChild(o);
+    });
+  });
+}
+
+function pickContact(selectEl, target) {
+  const idx = parseInt(selectEl.value, 10);
+  if (isNaN(idx)) return;
+  loadFromAddressBook(idx, target);
+  selectEl.selectedIndex = 0;
+}
+
+// --- O3: Inline Edit ---
+function editAddressBookEntry(index) {
+  const book = getAddressBook();
+  const entry = book[index];
+  if (!entry) return;
+
+  const list = $('addressBookList');
+  if (!list) return;
+
+  // Find the entry element by index in the rendered list
+  const entryEls = list.querySelectorAll('.address-book-entry');
+  // Find which rendered element corresponds to this book index
+  let targetEl = null;
+  entryEls.forEach(el => {
+    const editBtn = el.querySelector('[onclick*="editAddressBookEntry(' + index + ')"]');
+    if (editBtn) targetEl = el;
+  });
+  if (!targetEl) return;
+
+  const form = document.createElement('div');
+  form.className = 'address-book-edit-form';
+  form.innerHTML = `
+    <input type="text" class="edit-name" value="${escapeHtml(entry.name || '')}" placeholder="Name" />
+    <textarea class="edit-address" placeholder="Address">${escapeHtml(entry.address || '')}</textarea>
+    <input type="text" class="edit-phone" value="${escapeHtml(entry.phone || '')}" placeholder="Phone" />
+    <input type="text" class="edit-email" value="${escapeHtml(entry.email || '')}" placeholder="Email" />
+    <input type="text" class="edit-taxid" value="${escapeHtml(entry.taxId || '')}" placeholder="Tax/VAT ID" />
+    <div class="address-book-edit-actions">
+      <button onclick="saveEditedEntry(${index}, this)">Save</button>
+      <button onclick="renderAddressBook()">Cancel</button>
+    </div>`;
+
+  targetEl.replaceWith(form);
+}
+
+function saveEditedEntry(index, btn) {
+  const form = btn.closest('.address-book-edit-form');
+  if (!form) return;
+
+  const book = getAddressBook();
+  book[index] = {
+    name:    form.querySelector('.edit-name').value.trim(),
+    address: form.querySelector('.edit-address').value.trim(),
+    phone:   form.querySelector('.edit-phone').value.trim(),
+    email:   form.querySelector('.edit-email').value.trim(),
+    taxId:   form.querySelector('.edit-taxid').value.trim()
+  };
+  setAddressBook(book);
+  renderAddressBook();
+  showToast('Updated "' + (book[index].name || 'contact') + '"');
+}
+
+// --- O4: Export / Import Address Book ---
+function exportAddressBook() {
+  const book = getAddressBook();
+  if (!book.length) { showToast('Address book is empty'); return; }
+  downloadFile('address-book.json', 'application/json', JSON.stringify(book, null, 2));
+  showToast('Address book exported (' + book.length + ' contacts)');
+}
+
+function importAddressBook() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = function(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(evt) {
+      try {
+        var imported = JSON.parse(evt.target.result);
+        if (!Array.isArray(imported)) throw new Error('Not an array');
+        var book = getAddressBook();
+        var added = 0;
+        imported.forEach(function(entry) {
+          if (!entry.name && !entry.address) return;
+          var existing = book.findIndex(function(e) { return e.name === entry.name; });
+          if (existing >= 0) {
+            book[existing] = { name: entry.name || '', address: entry.address || '', phone: entry.phone || '', email: entry.email || '', taxId: entry.taxId || '' };
+          } else {
+            book.push({ name: entry.name || '', address: entry.address || '', phone: entry.phone || '', email: entry.email || '', taxId: entry.taxId || '' });
+            added++;
+          }
+        });
+        setAddressBook(book);
+        renderAddressBook();
+        showToast('Imported ' + added + ' new, ' + (imported.length - added) + ' updated');
+      } catch (err) {
+        showToast('Invalid address book file');
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
 }
 
 // --- P: Event Bindings & Initialization ---
@@ -945,6 +1094,7 @@ function init() {
   loadSettings();
   applyVisibility();
   renderAddressBook();
+  renderContactPickers();
 
   // Auto-save on all form field edits
   const autoSaveFields = [
