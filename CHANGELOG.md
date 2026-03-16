@@ -1,5 +1,26 @@
 # Changelog
 
+## v5 — 2026-03-16 — Floating Settings, PDF Download & Enhanced Address Book
+
+### Added
+- **Floating settings panel** — slides in from the right as a fixed overlay (320px) with dimmed backdrop; close via × button, backdrop click, or Settings button
+- **PDF download** — client-side PDF generation using html2canvas + jsPDF (loaded from CDN); respects all visibility toggles, handles multi-page invoices, names file with invoice number
+- **Toast notifications** — visual feedback on save, load, delete, and export/import actions; auto-fades after 2 seconds
+- **Contact picker dropdowns** on all 3 party card headers (Shipper, Consignee, Importer) for instant one-click loading from address book
+- **Save Importer** button in address book (was missing; Save Shipper/Consignee already existed)
+- **Address book search/filter** — type to instantly filter contacts by name, address, email, phone, or tax ID
+- **Inline edit** for address book entries — click Edit to modify any saved contact in place
+- **Export/Import contacts** — backup and restore address book as JSON files; merge by name on import
+- **Delete confirmation** dialog before removing address book entries
+- **Richer address book display** — entries show name, first line of address, phone, and email (truncated with ellipsis)
+
+### Changed
+- Settings panel restyled from push-down block to `position: fixed` right-side overlay with backdrop and close button
+- `renderAddressBook()` now supports search filtering and tracks original indices for correct load/delete targeting
+- Cache-busted all script/CSS tags to `v=5.1`
+- Print/PDF hide rules updated to include toast, contact pickers, and settings overlay
+- Test suite expanded from 95 to 119 tests covering all new features
+
 ## v4 — 2026-03-16 — DHL Customs-Compliant Redesign
 
 ### Added

@@ -13,9 +13,13 @@ A lightweight web app for creating, editing, and printing customs-compliant comm
 - **Shipment summary** — Subtotal, editable Shipping Cost and Insurance, calculated Grand Total
 - **Declaration section** — exportable statement with signature line for customs clearance
 - **Auto-calculated totals** — line totals, subtotal, grand total, and total weight update live
+- **Floating settings panel** — slide-in overlay to toggle section visibility without leaving the invoice
+- **Address book** — save, search, edit, and load contacts directly from party card dropdowns; export/import as JSON
+- **PDF download** — client-side PDF generation via html2canvas + jsPDF for easy mobile sharing
+- **Toast notifications** — visual feedback on save, load, and delete actions
 - **Dark mode** toggle (print always stays black-on-white)
 - **Invoice history** — automatically saves invoices when you create a new one; load or delete past invoices (up to 50)
-- **Export** to CSV or JSON (includes all customs fields)
+- **Export** to CSV, JSON, or PDF (includes all customs fields)
 - **Print-ready** A4 layout with parties, shipment info, 9-column table, summary, and declaration
 - **LocalStorage persistence** — your current invoice survives browser refreshes; migrates from older versions automatically
 - **Responsive** layout for mobile and desktop
@@ -51,14 +55,16 @@ Edit `js/catalogue.js`:
    ```
 2. Add the product name to the appropriate category in `CATALOGUE_GROUPS`
 
-## Print Output
+## Print & PDF Output
 
-The print layout (Cmd/Ctrl+P) produces a clean A4 document with:
+The print layout (Cmd/Ctrl+P) and PDF download both produce a clean A4 document with:
 - Shipper and Consignee details side by side
 - Shipment details bar (origin, weight, packages, method, carrier, incoterms, reason)
 - 9-column items table (no delete button)
 - Summary with subtotal, shipping, insurance, and grand total
 - Declaration with signature line
+
+The PDF button uses html2canvas + jsPDF for client-side generation — no server required, works on mobile for easy sharing.
 
 ## Storage & Migration
 
