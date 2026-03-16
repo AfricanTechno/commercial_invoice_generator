@@ -1172,12 +1172,44 @@ function addProductFromPanel(key) {
   showToast('Added "' + key + '"');
 }
 
+// --- P0: Default Address Book Seeding ---
+const DEFAULT_CONTACTS = [
+  {
+    name: 'Default Shipper',
+    address: '123 Example Street\nWarehouse 1\nExample City 1000\nExampleland',
+    phone: '+10000000001',
+    email: 'shipper@example.com',
+    taxId: ''
+  },
+  {
+    name: 'Default Consignee',
+    address: '456 Sample Avenue\nSuite 2\nSample City 2000\nExampleland',
+    phone: '+10000000002',
+    email: 'consignee@example.com',
+    taxId: ''
+  },
+  {
+    name: 'Default Importer',
+    address: '789 Demo Road\nBuilding 3\nDemo City 3000\nExampleland',
+    phone: '+10000000003',
+    email: 'importer@example.com',
+    taxId: 'VAT-000'
+  }
+];
+
+function seedAddressBook() {
+  const book = getAddressBook();
+  if (book.length) return; // Already has contacts, don't overwrite
+  setAddressBook(DEFAULT_CONTACTS);
+}
+
 // --- P: Event Bindings & Initialization ---
 function init() {
   loadTheme();
   populateProductDropdown();
   loadSettings();
   applyVisibility();
+  seedAddressBook();
   renderAddressBook();
   renderContactPickers();
 

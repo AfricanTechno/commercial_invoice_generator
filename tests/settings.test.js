@@ -225,7 +225,12 @@ describe('Print respects visibility', () => {
 // Address Book
 // ============================================================
 describe('Address book', () => {
-  test('address book starts empty', () => {
+  beforeEach(() => {
+    // Clear seeded contacts so each test starts fresh
+    call('setAddressBook', []);
+  });
+
+  test('address book starts empty after clear', () => {
     const book = call('getAddressBook');
     expect(book).toEqual([]);
   });
@@ -342,6 +347,8 @@ describe('Toast notifications', () => {
 // Contact Pickers
 // ============================================================
 describe('Contact pickers', () => {
+  beforeEach(() => { call('setAddressBook', []); });
+
   test('shipper picker exists', () => {
     expect($('shipperPicker')).not.toBeNull();
   });
@@ -384,6 +391,8 @@ describe('Contact pickers', () => {
 // Address Book Search
 // ============================================================
 describe('Address book search', () => {
+  beforeEach(() => { call('setAddressBook', []); });
+
   test('search input exists', () => {
     expect($('addressBookSearch')).not.toBeNull();
   });
@@ -425,6 +434,8 @@ describe('Address book search', () => {
 // Address Book Export/Import
 // ============================================================
 describe('Address book export/import', () => {
+  beforeEach(() => { call('setAddressBook', []); });
+
   test('exportAddressBook function exists', () => {
     expect(typeof env.window.exportAddressBook).toBe('function');
   });
@@ -496,5 +507,66 @@ describe('Default contact info', () => {
 
   test('importer email starts blank', () => {
     expect($('importerEmail').value).toBe('');
+  });
+
+  test('importer VAT ID starts blank', () => {
+    expect($('importerTaxId').value).toBe('');
+  });
+});
+
+// ============================================================
+// Seeded Address Book
+// ============================================================
+describe('Seeded address book', () => {
+  test('address book is seeded with 3 default contacts', () => {
+    const book = call('getAddressBook');
+    expect(book.length).toBe(3);
+  });
+
+  test('Default Importer is in the address book', () => {
+    const book = call('getAddressBook');
+    const importer = book.find(c => c.name === 'Default Importer');
+    expect(importer).toBeDefined();
+    expect(importer.email).toBe('importer@example.com');
+    expect(importer.taxId).toBe('VAT-000');
+  });
+
+  test('Default Shipper is in the address book', () => {
+    const book = call('getAddressBook');
+    const shipper = book.find(c => c.name === 'Default Shipper');
+    expect(shipper).toBeDefined();
+    expect(shipper.phone).toBe('+10000000001');
+  });
+
+  test('Default Consignee is in the address book', () => {
+    const book = call('getAddressBook');
+    const consignee = book.find(c => c.name === 'Default Consignee');
+    expect(consignee).toBeDefined();
+    expect(consignee.phone).toBe('+10000000002');
+  });
+});
+
+// ============================================================
+// Product Panel
+// ============================================================
+describe('Product panel', () => {
+  test('productsPanel exists in DOM', () => {
+    expect(env.document.getElementById('productsPanel')).not.toBeNull();
+  });
+
+  test('renderProductPanel function exists', () => {
+    expect(typeof env.window.renderProductPanel).toBe('function');
+  });
+
+  test('addProductFromPanel function exists', () => {
+    expect(typeof env.window.addProductFromPanel).toBe('function');
+  });
+
+  test('togglePanel function exists', () => {
+    expect(typeof env.window.togglePanel).toBe('function');
+  });
+
+  test('closeAllPanels function exists', () => {
+    expect(typeof env.window.closeAllPanels).toBe('function');
   });
 });
