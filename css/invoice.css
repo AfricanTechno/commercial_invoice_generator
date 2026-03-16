@@ -608,8 +608,12 @@ h3 {
     background: transparent !important;
   }
 
-  .bar, .controls, .history-wrap, .side-panel, .settings-overlay, .toast, .contact-picker { display: none !important; }
+  .bar, .controls, .history-wrap, .side-panel, .settings-overlay, .toast, .contact-picker, .same-check { display: none !important; }
   .invoice-wrap { max-width: none; }
+  .invoice-wrap > h1 { display: none !important; }
+  .meta { display: none !important; }
+  .parties { display: none !important; }
+  .shipment-details { display: none !important; }
   .itemsWrap { display: none !important; }
   .totals { display: none !important; }
   .declaration { display: none !important; }

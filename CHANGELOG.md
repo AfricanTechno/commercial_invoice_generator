@@ -1,5 +1,19 @@
 # Changelog
 
+## v5.3 — 2026-03-16 — Print Fix & Offline PDF
+
+### Fixed
+- **Duplicate parties in print** — shipper, consignee, and importer no longer appear twice (interactive form is now hidden, only the clean print block renders)
+- **"Same as Consignee" checkbox hidden in print** — no longer visible in print or PDF output
+- **Meta fields cleaned up in print** — invoice number, date, AWB, and currency now render inside the print block without dropdown arrows or input borders; incoterms and reason only appear in the shipment details bar
+- **PDF generation works offline** — html2canvas and jsPDF bundled locally in `lib/` instead of loaded from CDN, so PDF export works on `file://` without internet
+
+### Changed
+- Print layout now renders entirely from `#printBlock` — interactive form sections (`.meta`, `.parties`, `.shipment-details`, `.itemsWrap`, `.totals`, `.declaration`) are all hidden via `@media print`
+- `buildPrintBlock()` now generates title and meta header (invoice no, date, AWB, currency, shipment ref)
+- CDN `<script>` tags replaced with local `lib/html2canvas.min.js` and `lib/jspdf.umd.min.js`
+- Cache-busted to `v=5.3`
+
 ## v5.2 — 2026-03-16 — Side Panels, Sticky Toolbar & Product Browser
 
 ### Added

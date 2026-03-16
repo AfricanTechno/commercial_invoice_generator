@@ -254,6 +254,16 @@ function buildPrintBlock() {
   const st = getState();
   const cur = st.meta.currency || 'USD';
 
+  // Title + Meta header
+  let metaHtml = '<h1 style="font-size:16px;margin:0 0 8px;text-transform:uppercase;">Commercial Invoice</h1>';
+  metaHtml += '<div class="print-meta" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:2px 12px;margin-bottom:8px;font-size:10px;">';
+  if (st.meta.invoice) metaHtml += `<div><strong>Invoice No:</strong> ${escapeHtml(st.meta.invoice)}</div>`;
+  if (st.meta.date) metaHtml += `<div><strong>Date:</strong> ${escapeHtml(st.meta.date)}</div>`;
+  if (st.meta.waybill) metaHtml += `<div><strong>AWB:</strong> ${escapeHtml(st.meta.waybill)}</div>`;
+  metaHtml += `<div><strong>Currency:</strong> ${escapeHtml(cur)}</div>`;
+  if (st.meta.shipmentRef) metaHtml += `<div><strong>Ref:</strong> ${escapeHtml(st.meta.shipmentRef)}</div>`;
+  metaHtml += '</div>';
+
   // Parties
   let partiesHtml = '<div class="print-parties">';
   partiesHtml += buildPrintParty('Shipper / Exporter', st.parties.shipper);
@@ -334,7 +344,7 @@ function buildPrintBlock() {
     </div>
   </div>`;
 
-  block.innerHTML = partiesHtml + shipHtml + tableHtml + summaryHtml + declHtml;
+  block.innerHTML = metaHtml + partiesHtml + shipHtml + tableHtml + summaryHtml + declHtml;
 }
 
 function buildPrintParty(title, party) {
@@ -671,7 +681,7 @@ function downloadPDF() {
 
   // Use html2canvas + jsPDF
   if (typeof html2canvas === 'undefined' || typeof jspdf === 'undefined') {
-    alert('PDF libraries not loaded. Please check your internet connection and reload.');
+    alert('PDF libraries not loaded. Please ensure lib/html2canvas.min.js and lib/jspdf.umd.min.js exist and reload.');
     document.body.removeChild(container);
     return;
   }

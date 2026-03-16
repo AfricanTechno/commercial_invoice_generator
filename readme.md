@@ -17,12 +17,12 @@ A lightweight web app for creating, editing, and printing customs-compliant comm
 - **Product catalogue panel** — browse all products by category with search, view HS codes and prices, add to invoice with one click
 - **Contacts panel** — save, search, edit, and load contacts directly from party card dropdowns; export/import as JSON
 - **Settings panel** — slide-in overlay to toggle section visibility without leaving the invoice
-- **PDF download** — client-side PDF generation via html2canvas + jsPDF for easy mobile sharing
+- **PDF download** — client-side PDF generation via html2canvas + jsPDF, bundled locally for offline use
 - **Toast notifications** — visual feedback on save, load, and delete actions
 - **Dark mode** toggle (print always stays black-on-white)
 - **Invoice history** — automatically saves invoices when you create a new one; load or delete past invoices (up to 50)
 - **Export** to CSV, JSON, or PDF (includes all customs fields)
-- **Print-ready** A4 layout with parties, shipment info, 9-column table, summary, and declaration
+- **Print-ready** A4 layout — clean print block with title, meta, parties, shipment bar, 9-column table, summary, and declaration (no duplicate sections or form chrome)
 - **LocalStorage persistence** — your current invoice survives browser refreshes; migrates from older versions automatically
 - **Responsive** layout for mobile and desktop
 
@@ -45,6 +45,9 @@ css/
 js/
   catalogue.js        # Product data + category groupings (edit here to add products)
   invoice.js          # Application logic: state, history, export, calculations
+lib/
+  html2canvas.min.js  # PDF rendering (bundled locally for offline use)
+  jspdf.umd.min.js    # PDF generation (bundled locally for offline use)
 ```
 
 ## Adding Products
@@ -60,13 +63,14 @@ Edit `js/catalogue.js`:
 ## Print & PDF Output
 
 The print layout (Cmd/Ctrl+P) and PDF download both produce a clean A4 document with:
-- Shipper and Consignee details side by side
+- Title, invoice number, date, AWB, and currency header
+- Shipper and Consignee details side by side, Importer below (if enabled)
 - Shipment details bar (origin, weight, packages, method, carrier, incoterms, reason)
-- 9-column items table (no delete button)
+- 9-column items table (no delete button or form chrome)
 - Summary with subtotal, shipping, insurance, and grand total
 - Declaration with signature line
 
-The PDF button uses html2canvas + jsPDF for client-side generation — no server required, works on mobile for easy sharing.
+All interactive form elements (dropdowns, inputs, checkboxes) are hidden in print — only clean text renders. The PDF button uses html2canvas + jsPDF bundled locally in `lib/` — no server or internet required, works on mobile and `file://`.
 
 ## Storage & Migration
 
