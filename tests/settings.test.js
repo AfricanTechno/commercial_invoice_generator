@@ -26,13 +26,38 @@ function $$(sel) {
 }
 
 // ============================================================
-// Settings Panel
+// Settings Panel (floating overlay)
 // ============================================================
 describe('Settings panel', () => {
   test('settings panel exists and is hidden by default', () => {
     const panel = $('settingsPanel');
     expect(panel).not.toBeNull();
     expect(panel.classList.contains('open')).toBe(false);
+  });
+
+  test('settings overlay exists and is hidden by default', () => {
+    const overlay = $('settingsOverlay');
+    expect(overlay).not.toBeNull();
+    expect(overlay.classList.contains('open')).toBe(false);
+  });
+
+  test('toggleSettingsPanel() opens both panel and overlay', () => {
+    call('toggleSettingsPanel');
+    expect($('settingsPanel').classList.contains('open')).toBe(true);
+    expect($('settingsOverlay').classList.contains('open')).toBe(true);
+  });
+
+  test('toggleSettingsPanel() closes both panel and overlay', () => {
+    call('toggleSettingsPanel');
+    call('toggleSettingsPanel');
+    expect($('settingsPanel').classList.contains('open')).toBe(false);
+    expect($('settingsOverlay').classList.contains('open')).toBe(false);
+  });
+
+  test('close button exists in settings panel', () => {
+    const closeBtn = env.document.querySelector('.settings-close');
+    expect(closeBtn).not.toBeNull();
+    expect(closeBtn.textContent).toBe('×');
   });
 
   test('toggleSettingsPanel() opens and closes the panel', () => {
@@ -264,6 +289,22 @@ describe('Address book', () => {
     $('shipperAddr').value = '';
     call('saveToAddressBook', 'shipper');
     expect(call('getAddressBook').length).toBe(0);
+  });
+});
+
+// ============================================================
+// PDF Download
+// ============================================================
+describe('PDF download', () => {
+  test('downloadPDF function exists', () => {
+    expect(typeof env.window.downloadPDF).toBe('function');
+  });
+
+  test('downloadPDF alerts when libraries not loaded', () => {
+    let alertMsg = null;
+    env.window.alert = (msg) => { alertMsg = msg; };
+    call('downloadPDF');
+    expect(alertMsg).toContain('PDF libraries not loaded');
   });
 });
 

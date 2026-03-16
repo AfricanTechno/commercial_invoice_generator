@@ -628,6 +628,85 @@ function exportJSON() {
   downloadFile('invoice.json', 'application/json', JSON.stringify(getState(), null, 2));
 }
 
+// --- J2: PDF Download ---
+function downloadPDF() {
+  // Build print block first so it has current data
+  buildPrintBlock();
+
+  // Create a temporary container styled for PDF capture
+  const container = document.createElement('div');
+  container.style.cssText = 'position:absolute;left:-9999px;top:0;width:794px;background:#fff;color:#000;font-family:Arial,Helvetica,sans-serif;font-size:12px;padding:20px;';
+
+  const st = getState();
+  const cur = st.meta.currency || 'USD';
+
+  // Build a clean HTML representation for capture
+  let html = '<h1 style="font-size:16px;margin:0 0 10px;text-transform:uppercase;">Commercial Invoice</h1>';
+
+  // Meta info
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px 12px;margin-bottom:10px;font-size:10px;">';
+  if (st.meta.invoice) html += `<div><strong>Invoice No:</strong> ${escapeHtml(st.meta.invoice)}</div>`;
+  if (st.meta.date) html += `<div><strong>Date:</strong> ${escapeHtml(st.meta.date)}</div>`;
+  if (st.meta.waybill) html += `<div><strong>AWB:</strong> ${escapeHtml(st.meta.waybill)}</div>`;
+  html += `<div><strong>Currency:</strong> ${escapeHtml(cur)}</div>`;
+  if (st.meta.shipmentRef) html += `<div><strong>Ref:</strong> ${escapeHtml(st.meta.shipmentRef)}</div>`;
+  if (st.meta.incoterms) html += `<div><strong>Incoterms:</strong> ${escapeHtml(st.meta.incoterms)}</div>`;
+  if (st.meta.reasonForExport) html += `<div><strong>Reason:</strong> ${escapeHtml(st.meta.reasonForExport)}</div>`;
+  html += '</div>';
+
+  // Use the print block content (already respects visibility toggles)
+  html += $('printBlock').innerHTML;
+
+  container.innerHTML = html;
+  document.body.appendChild(container);
+
+  // Use html2canvas + jsPDF
+  if (typeof html2canvas === 'undefined' || typeof jspdf === 'undefined') {
+    alert('PDF libraries not loaded. Please check your internet connection and reload.');
+    document.body.removeChild(container);
+    return;
+  }
+
+  html2canvas(container, {
+    scale: 2,
+    useCORS: true,
+    logging: false,
+    backgroundColor: '#ffffff'
+  }).then(function(canvas) {
+    var pdf = new jspdf.jsPDF('p', 'mm', 'a4');
+    var pageWidth = 210;
+    var pageHeight = 297;
+    var margin = 10;
+    var contentWidth = pageWidth - margin * 2;
+    var imgWidth = contentWidth;
+    var imgHeight = (canvas.height * imgWidth) / canvas.width;
+    var imgData = canvas.toDataURL('image/png');
+
+    var heightLeft = imgHeight;
+    var position = margin;
+
+    // First page
+    pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
+    heightLeft -= (pageHeight - margin * 2);
+
+    // Additional pages if needed
+    while (heightLeft > 0) {
+      position = position - (pageHeight - margin * 2);
+      pdf.addPage();
+      pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
+      heightLeft -= (pageHeight - margin * 2);
+    }
+
+    var filename = 'invoice' + (st.meta.invoice ? '_' + st.meta.invoice : '') + '.pdf';
+    pdf.save(filename);
+    document.body.removeChild(container);
+  }).catch(function(err) {
+    console.error('PDF generation failed:', err);
+    alert('PDF generation failed. Please try Print instead.');
+    document.body.removeChild(container);
+  });
+}
+
 // --- K: Importer "Same as Consignee" ---
 function toggleImporterSame() {
   const cb = $('importerSameAsConsignee');
@@ -701,8 +780,10 @@ function newInvoice() {
 // --- N: Settings & Visibility ---
 function toggleSettingsPanel() {
   const panel = $('settingsPanel');
+  const overlay = $('settingsOverlay');
   if (!panel) return;
   panel.classList.toggle('open');
+  if (overlay) overlay.classList.toggle('open');
 }
 
 function getSettings() {
