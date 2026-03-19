@@ -53,7 +53,7 @@ Notes:
 - Contacts are private per signed-in user through Row Level Security.
 - The app keeps an IndexedDB cache for address-book data and queued sync operations.
 - Existing local-only contacts under `invoice_addressbook` trigger a one-time migration prompt after sign-in.
-- In local mode only, optional private bootstrap files at `local-data/address-book.local.json` and `local-data/products.local.json` are auto-imported once into the local cache when present.
+- In local mode only, optional private bootstrap files at `local-data/address-book.local.json`, `local-data/products.local.json`, and `local-data/invoice.local.json` are auto-imported once into the local cache or invoice state when present.
 
 ## Local Test Data
 
@@ -62,6 +62,7 @@ For local testing only, you can keep a private backup file outside version contr
 - This repo now ignores `local-data/*.local.json`
 - A local-only test file can live at `local-data/address-book.local.json`
 - A local-only product file can live at `local-data/products.local.json`
+- A local-only invoice seed file can live at `local-data/invoice.local.json`
 - That file is meant for your machine only and should not be committed
 
 To load your own contacts locally:
@@ -77,8 +78,11 @@ To preload local test data automatically in local mode:
 
 1. Put contacts in `local-data/address-book.local.json`.
 2. Put custom products in `local-data/products.local.json`.
-3. Start the app with the local server.
-4. On first load, the app imports those files into the browser cache automatically if present.
+3. Put starter invoice rows in `local-data/invoice.local.json`.
+4. Start the app with the local server.
+5. On first load, the app imports those files into the browser cache automatically if present.
+
+You can also load those same files on demand from the app by opening `Library` and clicking `Load Local Data`.
 
 If you specifically want to test the legacy migration banner:
 

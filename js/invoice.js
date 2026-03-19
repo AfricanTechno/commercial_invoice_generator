@@ -14,6 +14,7 @@ const STORAGE_KEY   = 'invoice_v4';
 const HISTORY_KEY   = 'invoice_history';
 const THEME_KEY     = 'invoice_theme';
 const MAX_HISTORY   = 50;
+const CLEAR_ONCE_KEY = 'invoice_clear_once';
 
 const LEGACY_KEYS = ['invoice_v3', 'invoice_pro_state_v2_no_vat', 'invoice_state'];
 const SETTINGS_KEY = 'invoice_settings';
@@ -115,6 +116,17 @@ function todayStr() {
   return `${dd}-${mm}-${d.getFullYear()}`;
 }
 
+async function fetchJsonIfAvailable(url) {
+  if (!url || typeof window.fetch !== 'function') return null;
+  try {
+    const response = await window.fetch(url, { cache: 'no-store' });
+    if (!response || !response.ok) return null;
+    return await response.json();
+  } catch (error) {
+    return null;
+  }
+}
+
 function val(id) { const el = $(id); return el ? el.value || '' : ''; }
 function setVal(id, v) { const el = $(id); if (el) el.value = v || ''; }
 function setSel(id, v) {
@@ -206,6 +218,45 @@ function getProductCategories() {
 
 function trimString(value) {
   return String(value || '').trim();
+}
+
+function clearSavedBrowserState() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(HISTORY_KEY);
+    localStorage.removeItem(SETTINGS_KEY);
+    localStorage.removeItem(CLEAR_ONCE_KEY);
+    LEGACY_KEYS.forEach((key) => localStorage.removeItem(key));
+  } catch (e) {}
+  APP_STATE.loadedSavedInvoice = false;
+}
+
+function markBlankInvoiceReload() {
+  try {
+    localStorage.setItem(CLEAR_ONCE_KEY, 'true');
+  } catch (e) {}
+}
+
+function consumeBlankInvoiceReload() {
+  try {
+    const shouldClear = localStorage.getItem(CLEAR_ONCE_KEY) === 'true';
+    if (shouldClear) localStorage.removeItem(CLEAR_ONCE_KEY);
+    return shouldClear;
+  } catch (e) {
+    return false;
+  }
+}
+
+function reloadAfterLocalDataClear() {
+  if (typeof window.__testReloadHook === 'function') {
+    window.__testReloadHook();
+    return;
+  }
+  if (window.location && typeof window.location.reload === 'function') {
+    window.setTimeout(function() {
+      window.location.reload();
+    }, 50);
+  }
 }
 
 function createEmptyParty() {
@@ -444,6 +495,27 @@ function addBlankRow() {
     qty: 1, desc: 'New Product', hs: '0000.00.00', unit: 0, sku: '',
     uom: 'pcs', origin: val('defaultOrigin') || DEFAULT_ORIGIN, weight: 0
   });
+}
+
+function applyInvoiceItems(items) {
+  const rows = Array.isArray(items) ? items.map((item) => ({
+    qty: parseFloat(item && item.qty) || 0,
+    desc: trimString(item && item.desc),
+    hs: trimString(item && item.hs),
+    unit: parseFloat(item && item.unit) || 0,
+    sku: trimString(item && item.sku),
+    uom: trimString(item && item.uom) || 'pcs',
+    origin: trimString(item && item.origin).toUpperCase(),
+    weight: parseFloat(item && item.weight) || 0
+  })) : [];
+  const normalizedRows = rows.filter((item) => item.desc);
+  if (!normalizedRows.length) return 0;
+  [...$$('#items [data-row]')].forEach((row) => row.remove());
+  normalizedRows.forEach((item) => {
+    addRow(item);
+  });
+  saveState();
+  return normalizedRows.length;
 }
 
 function addProduct() {
@@ -706,6 +778,14 @@ function getAddressBookContactById(contactId) {
   return APP_STATE.addressBook.find((entry) => entry.id === contactId && !entry.deleted_at) || null;
 }
 
+function getAddressBookContactForRole(role) {
+  const normalizedRole = trimString(role).toLowerCase();
+  if (!normalizedRole) return null;
+  return APP_STATE.addressBook.find((entry) =>
+    !entry.deleted_at && normalizeRoleHintsList(entry.role_hints).includes(normalizedRole)
+  ) || null;
+}
+
 function resolveCompanyProfile(profile, contacts) {
   if (!profile) return null;
   const next = cloneData(profile);
@@ -760,6 +840,27 @@ function applyCompanyProfileToShipperFields(profile) {
     return;
   }
   writePartyFields('shipper', profile);
+}
+
+function applyLoadedLocalContactsToInvoice() {
+  if (APP_VIEW !== 'invoice') return 0;
+  const assignments = [
+    ['shipper', 'shipper'],
+    ['consignee', 'consignee'],
+    ['importer', 'importer']
+  ];
+  let applied = 0;
+  assignments.forEach(([role, target]) => {
+    const contact = getAddressBookContactForRole(role);
+    if (!contact) return;
+    writePartyFields(target, contact);
+    applied += 1;
+  });
+  const cb = $('importerSameAsConsignee');
+  if (cb) cb.checked = false;
+  setPartyReadonly('importer', false);
+  if (applied) saveState();
+  return applied;
 }
 
 function getState() {
@@ -1150,6 +1251,42 @@ function generateInvoiceNumber() {
   saveState();
 }
 
+function applyBlankInvoiceState() {
+  [...$$('#items [data-row]')].forEach(r => r.remove());
+  if ($('subtotal')) $('subtotal').textContent = '0.00';
+  if ($('grandTotal')) $('grandTotal').textContent = '0.00';
+  if ($('totalWeight')) $('totalWeight').value = '0.00';
+
+  setVal('invoiceNumber', '');
+  setVal('invoiceDate', '');
+  setVal('waybill', '');
+  setVal('shipmentRef', '');
+  setVal('currency', 'USD');
+  if ($('currencyLabel')) $('currencyLabel').textContent = 'USD';
+  setSel('incoterms', 'DAP');
+  setSel('reasonForExport', 'Sale');
+
+  setVal('defaultOrigin', '');
+  setVal('numPackages', '');
+  setSel('shippingMethod', 'Express');
+  setSel('carrier', 'DHL');
+  setVal('carrierContactName', '');
+
+  setVal('shippingCost', '0.00');
+  setVal('insurance', '0.00');
+
+  setVal('declarantName', '');
+  setVal('declarantDate', '');
+
+  clearPartyFields('shipper');
+  clearPartyFields('consignee');
+  clearPartyFields('importer');
+
+  const cb = $('importerSameAsConsignee');
+  if (cb) cb.checked = false;
+  setPartyReadonly('importer', false);
+}
+
 // --- M: New Invoice ---
 function newInvoice() {
   saveToHistory();
@@ -1342,11 +1479,15 @@ function updateAuthUi(snapshot) {
   const configNote = $('cloudConfigNote');
   const syncStatus = $('syncStatus');
   const localSaveIndicator = $('localSaveIndicator');
+  const invoiceLocalModeBar = $('invoiceLocalModeBar');
   const signInBtn = $('signInBtn');
   const signUpBtn = $('signUpBtn');
   const signOutBtn = $('signOutBtn');
   const syncBtn = $('syncContactsBtn');
   const searchEl = $('addressBookSearch');
+  const loadLocalDataBtn = $('loadLocalDataBtn');
+  const invoiceLoadLocalDataBtn = $('invoiceLoadLocalDataBtn');
+  const invoiceClearLocalDataBtn = $('invoiceClearLocalDataBtn');
   const loadSampleBtn = $('loadSampleContactsBtn');
   const authFields = $('authFields');
   const authActions = $('authActions');
@@ -1380,6 +1521,9 @@ function updateAuthUi(snapshot) {
   if (localSaveIndicator) {
     localSaveIndicator.classList.toggle('section-hidden', !localMode);
     localSaveIndicator.textContent = localMode ? 'Contacts and products are saved locally in this browser' : '';
+  }
+  if (invoiceLocalModeBar) {
+    invoiceLocalModeBar.classList.toggle('section-hidden', !localMode);
   }
 
   if (signInBtn) signInBtn.disabled = localMode || snapshot.auth.signedIn;
@@ -1416,6 +1560,16 @@ function updateAuthUi(snapshot) {
   if (loadSampleBtn) {
     loadSampleBtn.classList.toggle('section-hidden', !snapshot.enableSampleData);
     loadSampleBtn.disabled = !canManageContacts;
+  }
+  if (loadLocalDataBtn) {
+    loadLocalDataBtn.classList.toggle('section-hidden', !localMode);
+    loadLocalDataBtn.disabled = !localMode;
+  }
+  if (invoiceLoadLocalDataBtn) {
+    invoiceLoadLocalDataBtn.disabled = !localMode;
+  }
+  if (invoiceClearLocalDataBtn) {
+    invoiceClearLocalDataBtn.disabled = !localMode;
   }
 }
 
@@ -1821,6 +1975,63 @@ async function loadSampleContacts() {
   }
 }
 
+async function loadLocalData() {
+  await ensureRepoReady();
+  try {
+    const results = await getRepo().loadLocalBootstrapData({
+      baseProducts: getBaseProductEntries()
+    });
+    const appliedRoles = applyLoadedLocalContactsToInvoice();
+    let invoiceItemsLoaded = 0;
+    if (APP_VIEW === 'invoice') {
+      const invoiceConfig = window.APP_CONFIG || {};
+      const invoiceBootstrap = await fetchJsonIfAvailable(invoiceConfig.localInvoiceBootstrapUrl || '/local-data/invoice.local.json');
+      const bootstrapItems = invoiceBootstrap && Array.isArray(invoiceBootstrap.items) ? invoiceBootstrap.items : [];
+      invoiceItemsLoaded = applyInvoiceItems(bootstrapItems);
+    }
+    if (!results.contactsLoaded && !results.productsLoaded) {
+      showToast('No local data files were found');
+      return;
+    }
+    let message = 'Loaded ' + results.contactsLoaded + ' contacts and ' + results.productsLoaded + ' products from local data';
+    if (appliedRoles) {
+      message += ' and filled ' + appliedRoles + ' invoice contact sections';
+    }
+    if (invoiceItemsLoaded) {
+      message += ' with ' + invoiceItemsLoaded + ' invoice line items';
+    }
+    showToast(message);
+  } catch (error) {
+    showToast(error && error.message ? error.message : 'Could not load local data');
+  }
+}
+
+async function clearLocalData() {
+  await ensureRepoReady();
+  if (!confirm('Clear locally saved contacts, products, and company profile from this browser?')) return;
+  try {
+    const results = await getRepo().clearLocalData();
+    clearSavedBrowserState();
+    markBlankInvoiceReload();
+    applyBlankInvoiceState();
+    APP_STATE.editingContactId = '';
+    APP_STATE.contactEditDraft = null;
+    APP_STATE.contactEditDirty = false;
+    APP_STATE.editingProductName = '';
+    APP_STATE.productEditDraft = null;
+    APP_STATE.productEditDirty = false;
+    if ($('addressBookSearch')) $('addressBookSearch').value = '';
+    if ($('productSearch')) $('productSearch').value = '';
+    renderAddressBook();
+    renderProductPanel();
+    renderContactPickers();
+    showToast('Cleared ' + results.contactsCleared + ' contacts and ' + results.productsCleared + ' products. Refreshing...');
+    reloadAfterLocalDataClear();
+  } catch (error) {
+    showToast(error && error.message ? error.message : 'Could not clear local data');
+  }
+}
+
 async function saveCompanyProfile() {
   await ensureRepoReady();
   try {
@@ -2181,7 +2392,10 @@ function init() {
 
   // Restore saved state or create default invoice
   APP_STATE.loadedSavedInvoice = loadState();
-  if (!APP_STATE.loadedSavedInvoice) {
+  if (consumeBlankInvoiceReload()) {
+    APP_STATE.loadedSavedInvoice = false;
+    applyBlankInvoiceState();
+  } else if (!APP_STATE.loadedSavedInvoice) {
     generateInvoiceNumber();
     setVal('invoiceDate', todayStr());
     setVal('declarantDate', todayStr());

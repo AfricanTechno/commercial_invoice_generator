@@ -97,6 +97,35 @@ html, body {
 /* --- Main Invoice Sheet --- */
 .stage { padding: 8px; }
 .invoice-wrap { max-width: 980px; margin: 0 auto; }
+.invoice-local-mode-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  margin: 0 0 10px;
+  border: 1px solid var(--border);
+  background: var(--history-bg);
+}
+.invoice-local-mode-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.invoice-local-mode-copy strong {
+  font-size: 11px;
+  text-transform: uppercase;
+}
+.invoice-local-mode-copy span {
+  font-size: 11px;
+  color: var(--muted);
+}
+.invoice-local-mode-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
 .library-page { max-width: 1160px; }
 .library-grid {
   display: grid;
@@ -729,6 +758,10 @@ h3 {
   .address-fields .field:nth-child(2) { grid-column: auto; }
   .declaration-fields { grid-template-columns: 1fr; }
   .library-grid { grid-template-columns: 1fr; }
+  .invoice-local-mode-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 
 /* --- Print: always light, hide chrome --- */
@@ -747,7 +780,7 @@ h3 {
     background: transparent !important;
   }
 
-  .bar, .controls, .history-wrap, .side-panel, .settings-overlay, .toast, .contact-picker, .same-check { display: none !important; }
+  .bar, .controls, .history-wrap, .side-panel, .settings-overlay, .toast, .contact-picker, .same-check, .invoice-local-mode-bar { display: none !important; }
   .invoice-wrap { max-width: none; }
   .invoice-wrap > h1 { display: none !important; }
   .meta { display: none !important; }

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Library - Invoice Generator</title>
-  <link rel="stylesheet" href="css/invoice.css?v=6.2" />
+  <link rel="stylesheet" href="css/invoice.css?v=6.4" />
 </head>
 <body data-view="library">
   <div class="bar">
@@ -65,6 +65,7 @@
             <button class="btn" data-contact-action="true" onclick="startNewContact()">New Contact</button>
             <button class="btn" data-contact-action="true" onclick="exportAddressBook()">Export Backup</button>
             <button class="btn" data-contact-action="true" onclick="importAddressBook()">Import Backup</button>
+            <button class="btn" id="loadLocalDataBtn" onclick="loadLocalData()">Load Local Data</button>
             <button class="btn section-hidden" data-contact-action="true" id="loadSampleContactsBtn" onclick="loadSampleContacts()">Load Sample Data</button>
           </div>
 
@@ -85,8 +86,8 @@
   </main>
 
   <script src="js/catalogue.js?v=5.3"></script>
-  <script src="js/app-config.js?v=6.2"></script>
-  <script src="js/address-book-service.js?v=6.6"></script>
-  <script src="js/invoice.js?v=6.4"></script>
+  <script src="js/app-config.js?v=6.3"></script>
+  <script src="js/address-book-service.js?v=6.9"></script>
+  <script src="js/invoice.js?v=6.10"></script>
 </body>
 </html>

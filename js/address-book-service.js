@@ -22,7 +22,8 @@
     migrationImported: 'legacy_migration_imported',
     lastSyncAt: 'last_sync_at',
     localContactsBootstrapImported: 'local_contacts_bootstrap_imported',
-    localProductsBootstrapImported: 'local_products_bootstrap_imported'
+    localProductsBootstrapImported: 'local_products_bootstrap_imported',
+    localDataCleared: 'local_data_cleared'
   };
 
   const SAMPLE_CONTACTS = [
@@ -310,6 +311,15 @@
 
   function isOnline() {
     return global.navigator ? global.navigator.onLine !== false : true;
+  }
+
+  function findExistingByNameOrId(entries, normalized) {
+    const nameKey = String(normalized && normalized.name || '').trim().toLowerCase();
+    return (entries || []).find((entry) => {
+      if (!entry || entry.deleted_at) return false;
+      if (normalized && normalized.id && entry.id === normalized.id) return true;
+      return !!nameKey && String(entry.name || '').trim().toLowerCase() === nameKey;
+    }) || null;
   }
 
   async function fetchJsonIfAvailable(url) {
@@ -916,7 +926,8 @@
     async function refreshLocalState() {
       const cachedContacts = await driver.getAllContacts();
       let cachedProducts = await driver.getAllProducts();
-      if (!cachedProducts.length && seedProducts.length) {
+      const localDataCleared = !!(await driver.getMeta(META_KEYS.localDataCleared));
+      if (!cachedProducts.length && seedProducts.length && !localDataCleared) {
         const normalizedSeeds = seedProducts.map((product) => normalizeProduct(product, product)).filter(Boolean);
         if (normalizedSeeds.length) {
           await driver.replaceProducts(normalizedSeeds);
@@ -1059,6 +1070,7 @@
 
     async function autoImportLocalBootstrapDataIfNeeded() {
       if (state.auth.configured) return;
+      if (await driver.getMeta(META_KEYS.localDataCleared)) return;
 
       const existingContacts = await driver.getAllContacts();
       const contactEntries = await fetchJsonIfAvailable(config.localContactsBootstrapUrl);
@@ -1100,6 +1112,44 @@
         }
         await driver.setMeta(META_KEYS.localProductsBootstrapImported, nowIso());
       }
+    }
+
+    async function mergeContactsFromEntries(entries) {
+      if (!Array.isArray(entries) || !entries.length) return 0;
+      let loaded = 0;
+      const existingContacts = await driver.getAllContacts();
+      for (const entry of entries) {
+        const probe = normalizeContact(entry, entry);
+        if (!probe) continue;
+        const existing = findExistingByNameOrId(existingContacts, probe);
+        const normalized = normalizeContact(entry, existing || entry);
+        if (!normalized) continue;
+        await driver.putContact(normalized);
+        const existingIndex = existingContacts.findIndex((item) => item.id === normalized.id);
+        if (existingIndex >= 0) existingContacts[existingIndex] = clone(normalized);
+        else existingContacts.push(clone(normalized));
+        loaded += 1;
+      }
+      return loaded;
+    }
+
+    async function mergeProductsFromEntries(entries) {
+      if (!Array.isArray(entries) || !entries.length) return 0;
+      let loaded = 0;
+      const existingProducts = await driver.getAllProducts();
+      for (const entry of entries) {
+        const probe = normalizeProduct(entry, entry);
+        if (!probe) continue;
+        const existing = findExistingByNameOrId(existingProducts, probe);
+        const normalized = normalizeProduct(entry, existing || entry);
+        if (!normalized) continue;
+        await driver.putProduct(normalized);
+        const existingIndex = existingProducts.findIndex((item) => item.id === normalized.id);
+        if (existingIndex >= 0) existingProducts[existingIndex] = clone(normalized);
+        else existingProducts.push(clone(normalized));
+        loaded += 1;
+      }
+      return loaded;
     }
 
     async function init() {
@@ -1269,6 +1319,49 @@
       return importContacts(SAMPLE_CONTACTS);
     }
 
+    async function loadLocalBootstrapData(options) {
+      if (state.auth.configured) throw new Error('Local data can only be loaded in local mode');
+      await driver.removeMeta(META_KEYS.localDataCleared);
+      const contactUrl = trimString(config.localContactsBootstrapUrl) || DEFAULT_CONFIG.localContactsBootstrapUrl;
+      const productUrl = trimString(config.localProductsBootstrapUrl) || DEFAULT_CONFIG.localProductsBootstrapUrl;
+      const contactEntries = await fetchJsonIfAvailable(contactUrl);
+      const productEntries = await fetchJsonIfAvailable(productUrl);
+      const baseProducts = Array.isArray(options && options.baseProducts) ? options.baseProducts : [];
+
+      const contactsLoaded = await mergeContactsFromEntries(contactEntries || []);
+      const productsLoaded = await mergeProductsFromEntries(baseProducts.concat(Array.isArray(productEntries) ? productEntries : []));
+      await refreshLocalState();
+      return {
+        contactsLoaded,
+        productsLoaded
+      };
+    }
+
+    async function clearLocalData() {
+      if (state.auth.configured) throw new Error('Local data can only be cleared in local mode');
+      const contactsCleared = state.contacts.filter((entry) => !entry.deleted_at).length;
+      const productsCleared = state.products.filter((entry) => !entry.deleted_at).length;
+      await driver.replaceContacts([]);
+      await driver.replaceProducts([]);
+      await driver.clearPendingOps();
+      await driver.clearCompanyProfile();
+      await driver.removeMeta(META_KEYS.lastSyncAt);
+      await driver.removeMeta(META_KEYS.localContactsBootstrapImported);
+      await driver.removeMeta(META_KEYS.localProductsBootstrapImported);
+      await driver.setMeta(META_KEYS.localDataCleared, true);
+      try {
+        global.localStorage.removeItem(legacyLocalStorageKey);
+        global.localStorage.removeItem(legacyProductStorageKey);
+        global.localStorage.removeItem(META_KEYS.migrationImported);
+        global.localStorage.removeItem(META_KEYS.migrationDismissed);
+      } catch (e) {}
+      await refreshLocalState();
+      return {
+        contactsCleared,
+        productsCleared
+      };
+    }
+
     return {
       init,
       sync,
@@ -1286,6 +1379,8 @@
       importLegacyLocalContacts,
       dismissMigration,
       loadSampleContacts,
+      loadLocalBootstrapData,
+      clearLocalData,
       __debugSetAuthState(nextSnapshot) {
         auth.setTestSnapshot(nextSnapshot);
       },

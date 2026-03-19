@@ -604,11 +604,194 @@ describe('Cloud address book defaults', () => {
     expect($('localSaveIndicator').textContent).toContain('saved locally');
   });
 
+  test('local mode shows an explicit load local data action on the invoice page', () => {
+    expect($('invoiceLocalModeBar').classList.contains('section-hidden')).toBe(false);
+    expect($('invoiceLoadLocalDataBtn')).not.toBeNull();
+    expect($('invoiceLoadLocalDataBtn').disabled).toBe(false);
+    expect($('invoiceClearLocalDataBtn')).not.toBeNull();
+    expect($('invoiceClearLocalDataBtn').disabled).toBe(false);
+  });
+
   test('configured cloud mode disables the address book while signed out', async () => {
     await enterSignedOutCloudMode();
     expect($('addressBookSearch').disabled).toBe(true);
     expect($('shipperPicker').disabled).toBe(true);
     expect(env.document.querySelector('#addressBookList').textContent).toContain('Sign in');
+  });
+
+  test('configured cloud mode hides the invoice local data action', async () => {
+    await enterSignedOutCloudMode();
+    expect($('invoiceLocalModeBar').classList.contains('section-hidden')).toBe(true);
+    expect($('invoiceLoadLocalDataBtn').disabled).toBe(true);
+    expect($('invoiceClearLocalDataBtn').disabled).toBe(true);
+  });
+});
+
+describe('Local data loader', () => {
+  test('loadLocalData imports local contacts and products on demand', async () => {
+    env.window.fetch = async (url) => {
+      const href = String(url || '');
+      if (href.includes('address-book.local.json')) {
+        return {
+          ok: true,
+          async json() {
+            return [
+              {
+                name: 'Repo Test Shipper',
+                address1: '1 Repo Way',
+                city: 'Pretoria',
+                country: 'ZA',
+                role_hints: ['shipper'],
+                phone: '+27110000001'
+              },
+              {
+                name: 'Repo Test Consignee',
+                address1: '2 Repo Way',
+                city: 'Pretoria',
+                country: 'ZA',
+                role_hints: ['consignee'],
+                phone: '+27110000002'
+              },
+              {
+                name: 'Repo Test Importer',
+                address1: '3 Repo Way',
+                city: 'Pretoria',
+                country: 'ZA',
+                role_hints: ['importer'],
+                phone: '+27110000003'
+              }
+            ];
+          }
+        };
+      }
+      if (href.includes('products.local.json')) {
+        return {
+          ok: true,
+          async json() {
+            return [
+              {
+                name: 'Repo Test Product',
+                category: 'Other',
+                hs: '1234.56.78',
+                unit: 99.99,
+                sku: 'REPO-1',
+                origin: 'ZA',
+                weight: 0.5
+              }
+            ];
+          }
+        };
+      }
+      if (href.includes('invoice.local.json')) {
+        return {
+          ok: true,
+          async json() {
+            return {
+              items: [
+                {
+                  qty: 2,
+                  desc: 'Repo Test Invoice Product',
+                  hs: '1234.56.78',
+                  unit: 99.99,
+                  sku: 'REPO-ROW',
+                  uom: 'pcs',
+                  origin: 'ZA',
+                  weight: 0.5
+                },
+                {
+                  qty: 3,
+                  desc: 'Repo Test Cable',
+                  hs: '2222.33.44',
+                  unit: 49.5,
+                  sku: '',
+                  uom: 'pcs',
+                  origin: 'US',
+                  weight: 0.2
+                }
+              ]
+            };
+          }
+        };
+      }
+      return { ok: false, async json() { return []; } };
+    };
+
+    await call('loadLocalData');
+    const repo = call('getRepo');
+    const contacts = await repo.listContacts();
+    const products = await repo.listProducts();
+
+    expect(contacts.some((entry) => entry.name === 'Repo Test Shipper')).toBe(true);
+    expect(products.some((entry) => entry.name === 'Repo Test Product')).toBe(true);
+    expect($('shipperName').value).toBe('Repo Test Shipper');
+    expect($('consigneeName').value).toBe('Repo Test Consignee');
+    expect($('importerName').value).toBe('Repo Test Importer');
+    expect(env.document.querySelectorAll('#items [data-row]').length).toBe(2);
+    expect(env.document.querySelector('#items [data-row] .desc').value).toBe('Repo Test Invoice Product');
+  });
+
+  test('clearLocalData removes local contacts and products after loading them', async () => {
+    env.window.fetch = async (url) => {
+      const href = String(url || '');
+      if (href.includes('address-book.local.json')) {
+        return {
+          ok: true,
+          async json() {
+            return [
+              { name: 'Repo Test Contact', address1: '1 Repo Way', city: 'Pretoria', country: 'ZA' }
+            ];
+          }
+        };
+      }
+      if (href.includes('products.local.json')) {
+        return {
+          ok: true,
+          async json() {
+            return [
+              { name: 'Repo Test Product', category: 'Other', hs: '1234.56.78', unit: 99.99, origin: 'ZA', weight: 0.5 }
+            ];
+          }
+        };
+      }
+      if (href.includes('invoice.local.json')) {
+        return {
+          ok: true,
+          async json() {
+            return {
+              items: [
+                { qty: 1, desc: 'Repo Test Invoice Product', hs: '1234.56.78', unit: 99.99, origin: 'ZA', weight: 0.5 }
+              ]
+            };
+          }
+        };
+      }
+      return { ok: false, async json() { return []; } };
+    };
+
+    await call('loadLocalData');
+    env.window.localStorage.setItem('invoice_v4', JSON.stringify({ meta: { invoice: 'TEST-123' } }));
+    env.window.localStorage.setItem('invoice_history', JSON.stringify([{ id: 1 }]));
+    env.window.localStorage.setItem('invoice_settings', JSON.stringify({ togIncoterms: true }));
+    env.window.confirm = () => true;
+    const reloadHook = jest.fn();
+    env.window.__testReloadHook = reloadHook;
+    await call('clearLocalData');
+
+    const repo = call('getRepo');
+    const contacts = await repo.listContacts();
+    const products = await repo.listProducts();
+
+    expect(contacts).toEqual([]);
+    expect(products).toEqual([]);
+    expect(env.window.localStorage.getItem('invoice_v4')).toBeNull();
+    expect(env.window.localStorage.getItem('invoice_history')).toBeNull();
+    expect(env.window.localStorage.getItem('invoice_settings')).toBeNull();
+    expect(env.window.localStorage.getItem('invoice_clear_once')).toBe('true');
+    expect($('invoiceNumber').value).toBe('');
+    expect($('invoiceDate').value).toBe('');
+    expect($('declarantDate').value).toBe('');
+    expect(env.document.querySelectorAll('#items [data-row]').length).toBe(0);
+    expect(reloadHook).toHaveBeenCalledTimes(1);
   });
 });
 
