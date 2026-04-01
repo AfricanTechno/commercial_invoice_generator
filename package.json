@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "A lightweight web app for creating, editing, and printing customs-compliant commercial invoices compatible with DHL, FedEx, UPS, and Aramex. No frameworks, no build tools — just open `index.html` in a browser.",
   "main": "index.js",
+  "packageManager": "npm@11.12.1",
   "scripts": {
     "test": "jest --verbose"
   },
