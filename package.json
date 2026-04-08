@@ -5,7 +5,9 @@
   "main": "index.js",
   "packageManager": "npm@11.12.1",
   "scripts": {
-    "test": "jest --verbose"
+    "test": "jest --verbose",
+    "test:ci": "jest --runInBand --verbose",
+    "check": "npm run test:ci"
   },
   "jest": {
     "testEnvironment": "node",
