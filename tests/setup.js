@@ -12,15 +12,17 @@ function createInvoiceDOM() {
   const addressBookServicePath = path.resolve(__dirname, '..', 'js', 'address-book-service.js');
   const invoicePath = path.resolve(__dirname, '..', 'js', 'invoice.js');
 
-  const html = fs.readFileSync(htmlPath, 'utf-8');
+  const html = fs
+    .readFileSync(htmlPath, 'utf-8')
+    .replace(/<link[^>]*href="[^"]+"[^>]*\/?>/g, '')
+    .replace(/<script[^>]*src="[^"]+"[^>]*><\/script>/g, '');
   const catalogueJS = fs.readFileSync(cataloguePath, 'utf-8');
   const addressBookServiceJS = fs.readFileSync(addressBookServicePath, 'utf-8');
   const invoiceJS = fs.readFileSync(invoicePath, 'utf-8');
 
   const dom = new JSDOM(html, {
     url: 'http://localhost:8080',
-    runScripts: 'dangerously',
-    resources: 'usable',
+    runScripts: 'outside-only',
     pretendToBeVisual: true,
     storageQuota: 10 * 1024 * 1024
   });
