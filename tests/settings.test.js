@@ -93,7 +93,7 @@ describe('Settings panel', () => {
     const toggleIds = [
       'togShipmentRef', 'togIncoterms', 'togReasonForExport',
       'togImporter', 'togShipmentDetails',
-      'togUom', 'togOrigin', 'togWeight',
+      'togLineNumber', 'togUom', 'togOrigin', 'togWeight',
       'togShippingCost', 'togInsurance', 'togDeclaration'
     ];
     toggleIds.forEach(id => {
@@ -107,6 +107,7 @@ describe('Settings panel', () => {
     const checkedByDefault = [
       'togIncoterms',
       'togShipmentDetails',
+      'togLineNumber',
       'togUom'
     ];
     checkedByDefault.forEach(id => {
@@ -178,6 +179,16 @@ describe('Visibility toggles', () => {
     const wrapper = $('incoterms').closest('.field');
     expect(wrapper.classList.contains('section-hidden')).toBe(true);
   });
+
+  test('toggling line item number off hides the number column', () => {
+    $('togLineNumber').checked = false;
+    call('applyVisibility');
+    const headerCell = env.document.querySelector('.head.gridCols > div:first-child');
+    const rowCell = env.document.querySelector('#items [data-row] .cell:first-child');
+    expect(headerCell.classList.contains('section-hidden')).toBe(true);
+    expect(rowCell.classList.contains('section-hidden')).toBe(true);
+    expect(env.document.querySelector('.head.gridCols').style.gridTemplateColumns).not.toContain('28px');
+  });
 });
 
 // ============================================================
@@ -234,6 +245,14 @@ describe('Print respects visibility', () => {
     call('buildPrintBlock');
     const ths = [...$('printBlock').querySelectorAll('th')].map(th => th.textContent);
     expect(ths).not.toContain('UoM');
+  });
+
+  test('line item number hidden from print when toggled off', () => {
+    $('togLineNumber').checked = false;
+    call('applyVisibility');
+    call('buildPrintBlock');
+    const ths = [...$('printBlock').querySelectorAll('th')].map(th => th.textContent);
+    expect(ths).not.toContain('#');
   });
 
   test('importer hidden from print when toggled off', () => {

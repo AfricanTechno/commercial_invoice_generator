@@ -21,8 +21,11 @@ A lightweight web app for creating, editing, and printing customs-compliant comm
 - **PDF download** — client-side PDF generation via html2canvas + jsPDF, bundled locally for offline use
 - **Toast notifications** — visual feedback on save, load, and delete actions
 - **Dark mode** toggle (print always stays black-on-white)
-- **Invoice history** — automatically saves invoices when you create a new one; load or delete past invoices (up to 50)
+- **Invoice history** — save the current invoice locally, automatically archive invoices when you create a new one, then load or delete past invoices (up to 50)
 - **Export** to CSV, JSON, or PDF (includes all customs fields)
+- **Import Data** — load invoice JSON payloads that can include meta fields, parties, products, contacts, and line items
+- **Sort A-Z** — reorder invoice line items by product description without changing totals
+- **Column visibility** — hide optional invoice columns, including line item numbers, unit of measure, country of origin, and weight
 - **Print-ready** A4 layout — clean print block with title, meta, parties, shipment bar, 9-column table, summary, and declaration (no duplicate sections or form chrome)
 - **LocalStorage persistence** — your current invoice survives browser refreshes; migrates from older versions automatically
 - **Responsive** layout for mobile and desktop
@@ -36,6 +39,16 @@ python3 -m http.server 8080
 ```
 
 Then visit `http://localhost:8080`.
+
+### Local Private Invoice Seeds
+
+This is a public repo, so tracked files should not include real customer, invoice, shipment, tax, phone, address, email, tracking, or generated PDF data.
+
+- `index.html` intentionally opens as a neutral/default invoice.
+- Keep shipment-specific invoice seeds in ignored `local-data/*.local.json` files, browser storage, or another private local override.
+- Do not commit inline `INVOICE_PREVIEW_STATE`, `INVOICE_PREVIEW_CONTACTS`, `INVOICE_PREVIEW_PRODUCTS`, or `INVOICE_PREVIEW_HISTORY` blocks with real business data.
+- The History reader can merge an optional `window.INVOICE_PREVIEW_HISTORY` seed when a private local override provides one, and falls back to that seed if browser storage is unavailable.
+- Generated invoices and PDF previews should stay in ignored export folders or other private storage.
 
 ## Cloud Address Book Setup
 
@@ -64,6 +77,7 @@ For local testing only, you can keep a private backup file outside version contr
 - A local-only product file can live at `local-data/products.local.json`
 - A local-only invoice seed file can live at `local-data/invoice.local.json`
 - That file is meant for your machine only and should not be committed
+- In this workspace, ignored `local-data/*.local.json` files can hold private invoice rows, address-book entries, and product-library seeds without being published.
 
 To load your own contacts locally:
 

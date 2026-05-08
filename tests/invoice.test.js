@@ -107,6 +107,26 @@ describe('Row management', () => {
     const indices = [...$$('#items [data-row] .rowIndex')].map(el => el.textContent);
     expect(indices).toEqual(['1', '2', '3', '4']);
   });
+
+  test('sortInvoiceItemsByDescription() sorts rows while preserving item data', () => {
+    call('applyInvoiceItems', [
+      { qty: 1, desc: 'Zulu Stand', hs: '9620.00.0', unit: 4, sku: 'ZULU', uom: 'pcs', origin: 'CN', weight: 0.5 },
+      { qty: 1, desc: 'Adapter Plug', hs: '8504.40.8', unit: 10, sku: 'ADAPT', uom: 'pcs', origin: 'US', weight: 0.1 },
+      { qty: 2, desc: 'Camera Accessory', hs: '9006.91.3', unit: 5, sku: 'CAM', uom: 'set', origin: 'ZA', weight: 0.2 }
+    ]);
+
+    expect(call('sortInvoiceItemsByDescription')).toBe(3);
+
+    const rows = [...$$('#items [data-row]')];
+    expect(rows.map(row => row.querySelector('.desc').value)).toEqual([
+      'Adapter Plug',
+      'Camera Accessory',
+      'Zulu Stand'
+    ]);
+    expect(rows[0].querySelector('.hs').value).toBe('8504.40.8');
+    expect(rows[1].querySelector('.uom').value).toBe('set');
+    expect($('subtotal').textContent).toBe('24.00');
+  });
 });
 
 // ============================================================
@@ -312,6 +332,62 @@ describe('State persistence', () => {
 });
 
 // ============================================================
+// Structured payload import
+// ============================================================
+describe('Structured payload import', () => {
+  test('loadInvoicePayload() applies invoice data and stores contacts/products', async () => {
+    const result = await call('loadInvoicePayload', {
+      meta: {
+        invoice: '632781',
+        date: '25-04-2026',
+        waybill: '871071691925',
+        currency: 'USD'
+      },
+      parties: {
+        shipper: { name: 'Sender Trading Co', address1: '1 Sender Road', city: 'Cape Town', country: 'ZA' },
+        receiver: { name: 'Receiver Imports Ltd', address1: '2 Receiver Avenue', city: 'Johannesburg', country: 'ZA' }
+      },
+      shipment: {
+        numPackages: '2',
+        carrier: 'FedEx'
+      },
+      items: [
+        { qty: 1, desc: 'Tripod Stand', hs: '9620.00.0', unit: 12, origin: 'CN', weight: 0.4 },
+        { qty: 1, desc: 'Adapter Plug', hs: '8504.40.8', unit: 25, origin: 'CN', weight: 0.2 }
+      ],
+      contacts: [
+        { name: 'Sender Trading Co', address1: '1 Sender Road', city: 'Cape Town', country: 'ZA', role_hints: ['shipper'] }
+      ],
+      products: [
+        { name: 'Adapter Plug', category: 'Accessories', hs: '8504.40.8', unit: 25, origin: 'CN', weight: 0.2 }
+      ],
+      sortItems: true
+    });
+
+    expect(result.contactsLoaded).toBe(1);
+    expect(result.productsLoaded).toBe(1);
+    expect(result.itemsLoaded).toBe(2);
+    expect($('invoiceNumber').value).toBe('632781');
+    expect($('invoiceDate').value).toBe('25-04-2026');
+    expect($('waybill').value).toBe('871071691925');
+    expect($('shipperName').value).toBe('Sender Trading Co');
+    expect($('consigneeName').value).toBe('Receiver Imports Ltd');
+    expect($('numPackages').value).toBe('2');
+    expect($('carrier').value).toBe('FedEx');
+
+    const rows = [...$$('#items [data-row]')];
+    expect(rows.map(row => row.querySelector('.desc').value)).toEqual(['Adapter Plug', 'Tripod Stand']);
+
+    const repo = call('getRepo');
+    const contacts = await repo.listContacts();
+    const products = await repo.listProducts();
+    expect(contacts.some(contact => contact.name === 'Sender Trading Co')).toBe(true);
+    expect(products.some(product => product.name === 'Adapter Plug')).toBe(true);
+    expect(env.window.InvoiceGeneratorTools.loadPayload).toBe(env.window.loadInvoicePayload);
+  });
+});
+
+// ============================================================
 // Importer "Same as Consignee"
 // ============================================================
 describe('Importer same as consignee', () => {
@@ -329,6 +405,7 @@ describe('Importer same as consignee', () => {
     expect($('importerPhone').value).toBe('+27123456');
     expect($('importerName').hasAttribute('readonly')).toBe(true);
     expect($('importerCountry').disabled).toBe(true);
+    expect($('importerFields').classList.contains('section-hidden')).toBe(true);
   });
 
   test('unchecking the box re-enables importer fields', () => {
@@ -340,6 +417,7 @@ describe('Importer same as consignee', () => {
 
     expect($('importerName').hasAttribute('readonly')).toBe(false);
     expect($('importerCountry').disabled).toBe(false);
+    expect($('importerFields').classList.contains('section-hidden')).toBe(false);
   });
 });
 
@@ -464,6 +542,24 @@ describe('Print block', () => {
     expect(html).toContain('Consignee');
   });
 
+  test('print block uses consignee details for importer when same-as-consignee is checked', () => {
+    $('consigneeName').value = 'Buyer Co';
+    $('consigneeAddress1').value = '1 Buyer Street';
+    $('importerName').value = 'Stale Importer';
+    const cb = $('importerSameAsConsignee');
+    cb.checked = true;
+    call('toggleImporterSame');
+    $('togImporter').checked = true;
+    call('applyVisibility');
+    call('buildPrintBlock');
+
+    const html = $('printBlock').innerHTML;
+    expect(html).toContain('Importer of Record');
+    expect(html).toContain('Buyer Co');
+    expect(html).toContain('1 Buyer Street');
+    expect(html).not.toContain('Stale Importer');
+  });
+
   test('print block contains declaration when toggled on', () => {
     $('togDeclaration').checked = true;
     call('applyVisibility');
@@ -490,13 +586,30 @@ describe('Invoice history', () => {
   test('saveToHistory() stores an entry', () => {
     $('carrier').value = 'UPS';
     $('carrierContactName').value = 'Daliso';
-    call('saveToHistory');
+    const entry = call('saveToHistory');
     const history = call('getHistory');
+    expect(entry).toHaveProperty('invoiceNumber');
     expect(history.length).toBeGreaterThan(0);
     expect(history[0]).toHaveProperty('id');
     expect(history[0]).toHaveProperty('state');
     expect(history[0].carrier).toBe('UPS');
     expect(history[0].carrierContactName).toBe('Daliso');
+  });
+
+  test('saveCurrentInvoice() saves current invoice locally without duplicate rows for the same invoice', () => {
+    $('invoiceNumber').value = 'CURRENT-001';
+    $('carrier').value = 'Other';
+    $('carrierContactName').value = 'Local Courier';
+
+    const firstEntry = call('saveCurrentInvoice');
+    const secondEntry = call('saveCurrentInvoice');
+    const history = call('getHistory');
+
+    expect(firstEntry.invoiceNumber).toBe('CURRENT-001');
+    expect(secondEntry.invoiceNumber).toBe('CURRENT-001');
+    expect(history).toHaveLength(1);
+    expect(history[0].carrierContactName).toBe('Local Courier');
+    expect(env.document.body.textContent).toContain('Invoice saved locally');
   });
 
   test('loadFromHistory() restores a saved invoice', () => {
@@ -551,6 +664,45 @@ describe('Invoice history', () => {
     call('renderHistoryList');
     const html = $('historyPanel').textContent;
     expect(html).toContain('Carrier Contact: Alice');
+  });
+
+  test('getHistory() merges preview-seeded invoices when local history is missing them', () => {
+    env.window.localStorage.setItem('invoice_history', JSON.stringify([
+      { id: 1, invoiceNumber: 'KEEP-1', date: '01-01-2026', state: { shipment: {} } }
+    ]));
+    env.window.INVOICE_PREVIEW_HISTORY = [
+      { id: 2, invoiceNumber: 'SAMPLE-F2', date: '24-04-2026', state: { shipment: {}, items: [] } },
+      { id: 3, invoiceNumber: 'SAMPLE-F1', date: '20-03-2026', state: { shipment: {}, items: [] } }
+    ];
+
+    const history = call('getHistory');
+    expect(history.map((entry) => entry.invoiceNumber)).toEqual([
+      'SAMPLE-F2',
+      'SAMPLE-F1',
+      'KEEP-1'
+    ]);
+    expect(JSON.parse(env.window.localStorage.getItem('invoice_history'))).toHaveLength(3);
+  });
+
+  test('getHistory() falls back to preview-seeded invoices when storage read fails', () => {
+    env.window.INVOICE_PREVIEW_HISTORY = [
+      { id: 2, invoiceNumber: 'SAMPLE-F2', date: '24-04-2026', state: { shipment: {}, items: [] } },
+      { id: 3, invoiceNumber: 'SAMPLE-F1', date: '20-03-2026', state: { shipment: {}, items: [] } }
+    ];
+    const originalGetItem = env.window.Storage.prototype.getItem;
+    env.window.Storage.prototype.getItem = function() {
+      throw new Error('storage unavailable');
+    };
+
+    try {
+      const history = call('getHistory');
+      expect(history.map((entry) => entry.invoiceNumber)).toEqual([
+        'SAMPLE-F2',
+        'SAMPLE-F1'
+      ]);
+    } finally {
+      env.window.Storage.prototype.getItem = originalGetItem;
+    }
   });
 });
 

@@ -74,6 +74,7 @@ const VISIBILITY_MAP = {
   togReasonForExport: { field: 'reasonForExport', type: 'field' },
   togImporter:        { id: 'importerSection' },
   togShipmentDetails: { id: 'shipmentDetailsSection' },
+  togLineNumber:      { col: 0, headerClass: 'col-line-number' },
   togUom:             { col: 4, headerClass: 'col-uom' },
   togOrigin:          { col: 6, headerClass: 'col-origin' },
   togWeight:          { col: 7, headerClass: 'col-weight' },
@@ -81,6 +82,18 @@ const VISIBILITY_MAP = {
   togInsurance:       { id: 'insuranceRow' },
   togDeclaration:     { id: 'declarationSection' }
 };
+const ITEM_GRID_COLUMNS = [
+  '28px',
+  '38px',
+  'minmax(160px, 1fr)',
+  '90px',
+  '52px',
+  '72px',
+  '46px',
+  '56px',
+  '78px',
+  '38px'
+];
 
 // --- B: Utilities ---
 function escapeHtml(s) {
@@ -375,6 +388,13 @@ function setPartyReadonly(prefix, readOnly) {
   });
 }
 
+function syncImporterSameVisibility() {
+  const cb = $('importerSameAsConsignee');
+  const fields = $('importerFields');
+  if (!fields) return;
+  fields.classList.toggle('section-hidden', !!(cb && cb.checked));
+}
+
 // --- C: Theme ---
 function applyTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
@@ -497,8 +517,8 @@ function addBlankRow() {
   });
 }
 
-function applyInvoiceItems(items) {
-  const rows = Array.isArray(items) ? items.map((item) => ({
+function normalizeInvoiceItem(item) {
+  return {
     qty: parseFloat(item && item.qty) || 0,
     desc: trimString(item && item.desc),
     hs: trimString(item && item.hs),
@@ -507,8 +527,27 @@ function applyInvoiceItems(items) {
     uom: trimString(item && item.uom) || 'pcs',
     origin: trimString(item && item.origin).toUpperCase(),
     weight: parseFloat(item && item.weight) || 0
-  })) : [];
-  const normalizedRows = rows.filter((item) => item.desc);
+  };
+}
+
+function normalizeInvoiceItems(items) {
+  return (Array.isArray(items) ? items : [])
+    .map(normalizeInvoiceItem)
+    .filter((item) => item.desc);
+}
+
+function compareInvoiceItemsByDescription(a, b) {
+  const byDesc = a.desc.localeCompare(b.desc, undefined, { sensitivity: 'base' });
+  if (byDesc) return byDesc;
+  return a.hs.localeCompare(b.hs, undefined, { sensitivity: 'base' });
+}
+
+function sortItemsByDescription(items) {
+  return normalizeInvoiceItems(items).sort(compareInvoiceItemsByDescription);
+}
+
+function applyInvoiceItems(items) {
+  const normalizedRows = normalizeInvoiceItems(items);
   if (!normalizedRows.length) return 0;
   [...$$('#items [data-row]')].forEach((row) => row.remove());
   normalizedRows.forEach((item) => {
@@ -516,6 +555,17 @@ function applyInvoiceItems(items) {
   });
   saveState();
   return normalizedRows.length;
+}
+
+function sortInvoiceItemsByDescription() {
+  const sortedRows = sortItemsByDescription([...$$('#items [data-row]')].map(rowToData));
+  if (!sortedRows.length) {
+    showToast('No line items to sort');
+    return 0;
+  }
+  applyInvoiceItems(sortedRows);
+  showToast('Sorted ' + sortedRows.length + ' line items by description');
+  return sortedRows.length;
 }
 
 function addProduct() {
@@ -607,9 +657,10 @@ function buildPrintBlock() {
 
   const togImporter = $('togImporter');
   const showImporter = !togImporter || togImporter.checked;
-  if (showImporter && hasPartyValues(st.parties.importer) && !st.parties.importer.sameAsConsignee) {
+  const importerParty = st.parties.importer.sameAsConsignee ? st.parties.consignee : st.parties.importer;
+  if (showImporter && hasPartyValues(importerParty)) {
     partiesHtml += '<div class="print-parties" style="display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;margin-bottom:14px;font-size:10px;">';
-    partiesHtml += buildPrintParty('Importer of Record', st.parties.importer);
+    partiesHtml += buildPrintParty('Importer of Record', importerParty);
     partiesHtml += '</div>';
   }
 
@@ -617,6 +668,7 @@ function buildPrintBlock() {
   const showUom = !$('togUom') || $('togUom').checked;
   const showOrigin = !$('togOrigin') || $('togOrigin').checked;
   const showWeight = !$('togWeight') || $('togWeight').checked;
+  const showLineNumber = !$('togLineNumber') || $('togLineNumber').checked;
   const showShipDetails = !$('togShipmentDetails') || $('togShipmentDetails').checked;
   const showDecl = !$('togDeclaration') || $('togDeclaration').checked;
 
@@ -635,7 +687,7 @@ function buildPrintBlock() {
   // Items table — respect column visibility
   const thBase = 'padding:2px 3px;font-size:10px;border-bottom:2px solid #000;';
   let tableHtml = `<table style="width:100%;border-collapse:collapse;"><thead><tr>
-      <th style="${thBase}text-align:right;width:4%;">#</th>
+      ${showLineNumber ? '<th style="' + thBase + 'text-align:right;width:4%;">#</th>' : ''}
       <th style="${thBase}text-align:right;width:5%;">Qty</th>
       <th style="${thBase}text-align:left;">Description</th>
       <th style="${thBase}text-align:left;width:10%;">HS Code</th>
@@ -650,7 +702,7 @@ function buildPrintBlock() {
     const line = item.qty * item.unit;
     const tdStyle = 'padding:2px 3px;font-size:10px;border-bottom:1px solid #ddd;';
     tableHtml += `<tr>
-      <td style="${tdStyle}text-align:right">${idx + 1}</td>
+      ${showLineNumber ? '<td style="' + tdStyle + 'text-align:right">' + (idx + 1) + '</td>' : ''}
       <td style="${tdStyle}text-align:right">${item.qty}</td>
       <td style="${tdStyle}">${escapeHtml(item.desc)}</td>
       <td style="${tdStyle}">${escapeHtml(item.hs)}</td>
@@ -859,6 +911,7 @@ function applyLoadedLocalContactsToInvoice() {
   const cb = $('importerSameAsConsignee');
   if (cb) cb.checked = false;
   setPartyReadonly('importer', false);
+  syncImporterSameVisibility();
   if (applied) saveState();
   return applied;
 }
@@ -938,6 +991,7 @@ function setState(st) {
       });
     }
     setPartyReadonly('importer', cb.checked);
+    syncImporterSameVisibility();
   }
 
   // Shipment details
@@ -1000,11 +1054,25 @@ function loadState() {
 }
 
 // --- I: Invoice History ---
+function mergePreviewHistory(history) {
+  const seed = Array.isArray(window.INVOICE_PREVIEW_HISTORY) ? window.INVOICE_PREVIEW_HISTORY : [];
+  if (!seed.length) return history;
+
+  const existingInvoices = new Set((history || []).map((entry) => entry && entry.invoiceNumber).filter(Boolean));
+  const missing = seed.filter((entry) => entry && entry.invoiceNumber && !existingInvoices.has(entry.invoiceNumber));
+  if (!missing.length) return history;
+
+  const merged = missing.concat(history || []);
+  if (merged.length > MAX_HISTORY) merged.length = MAX_HISTORY;
+  setHistory(merged);
+  return merged;
+}
+
 function getHistory() {
   try {
     const raw = localStorage.getItem(HISTORY_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch (e) { return []; }
+    return mergePreviewHistory(raw ? JSON.parse(raw) : []);
+  } catch (e) { return mergePreviewHistory([]); }
 }
 
 function getHistoryEntryCarrier(entry) {
@@ -1036,9 +1104,10 @@ function setHistory(history) {
   }
 }
 
-function saveToHistory() {
+function saveToHistory(options) {
+  const opts = options || {};
   const st = getState();
-  if (!st.items.length && !st.meta.invoice) return;
+  if (!st.items.length && !st.meta.invoice) return null;
 
   const entry = {
     id: Date.now(),
@@ -1051,9 +1120,27 @@ function saveToHistory() {
   };
 
   const history = getHistory();
+  if (opts.replaceSameInvoice && st.meta.invoice) {
+    const existingIndex = history.findIndex((item) => item.invoiceNumber === entry.invoiceNumber);
+    if (existingIndex >= 0) history.splice(existingIndex, 1);
+  }
   history.unshift(entry);
   if (history.length > MAX_HISTORY) history.length = MAX_HISTORY;
   setHistory(history);
+  return entry;
+}
+
+function saveCurrentInvoice() {
+  const entry = saveToHistory({ replaceSameInvoice: true });
+  if (!entry) {
+    showToast('Nothing to save');
+    return null;
+  }
+
+  const panel = $('historyPanel');
+  if (panel && panel.classList.contains('open')) renderHistoryList();
+  showToast('Invoice saved locally');
+  return entry;
 }
 
 function loadFromHistory(id) {
@@ -1163,8 +1250,180 @@ function exportJSON() {
   downloadFile('invoice.json', 'application/json', JSON.stringify(getState(), null, 2));
 }
 
+function getInvoicePayloadSource(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return {};
+  if (payload.invoice && typeof payload.invoice === 'object' && !Array.isArray(payload.invoice)) {
+    return {
+      ...payload.invoice,
+      contacts: payload.contacts || payload.invoice.contacts,
+      products: payload.products || payload.invoice.products,
+      sortItems: payload.sortItems !== undefined ? payload.sortItems : payload.invoice.sortItems
+    };
+  }
+  return payload;
+}
+
+function firstPresentValue() {
+  for (const value of arguments) {
+    if (value !== undefined && value !== null) return value;
+  }
+  return undefined;
+}
+
+function applyPayloadValue(target, key) {
+  const value = firstPresentValue.apply(null, Array.prototype.slice.call(arguments, 2));
+  if (value !== undefined) target[key] = trimString(value);
+}
+
+function payloadHasPartyAssignments(source) {
+  const parties = source && source.parties ? source.parties : {};
+  return !!(source && (
+    source.shipper ||
+    source.consignee ||
+    source.receiver ||
+    source.importer ||
+    parties.shipper ||
+    parties.consignee ||
+    parties.receiver ||
+    parties.importer
+  ));
+}
+
+function getPayloadItems(source) {
+  if (!source) return undefined;
+  if (Array.isArray(source.items)) return source.items;
+  if (Array.isArray(source.lineItems)) return source.lineItems;
+  if (Array.isArray(source.lines)) return source.lines;
+  return undefined;
+}
+
+function mergeInvoicePayloadState(currentState, source, options) {
+  const next = cloneData(currentState || getState());
+  const opts = options || {};
+
+  const meta = { ...(next.meta || {}), ...((source && source.meta) || {}) };
+  applyPayloadValue(meta, 'invoice', source && source.invoiceNumber, source && source.invoiceNo, source && source.number, source && typeof source.invoice !== 'object' ? source.invoice : undefined);
+  applyPayloadValue(meta, 'date', source && source.invoiceDate, source && source.date);
+  applyPayloadValue(meta, 'waybill', source && source.waybillNumber, source && source.waybill);
+  applyPayloadValue(meta, 'currency', source && source.currency);
+  applyPayloadValue(meta, 'shipmentRef', source && source.shipmentRef);
+  applyPayloadValue(meta, 'incoterms', source && source.incoterms);
+  applyPayloadValue(meta, 'reasonForExport', source && source.reasonForExport);
+  if (meta.currency) meta.currency = String(meta.currency).toUpperCase();
+  next.meta = meta;
+
+  const parties = (source && source.parties) || {};
+  const shipper = firstPresentValue(parties.shipper, source && source.shipper);
+  const consignee = firstPresentValue(parties.consignee, parties.receiver, source && source.consignee, source && source.receiver);
+  const importer = firstPresentValue(parties.importer, source && source.importer);
+  next.parties = next.parties || {};
+  if (shipper !== undefined) next.parties.shipper = normalizePartyData(shipper);
+  if (consignee !== undefined) next.parties.consignee = normalizePartyData(consignee);
+  if (importer !== undefined) {
+    const sameAsConsignee = !!(importer && importer.sameAsConsignee);
+    next.parties.importer = { ...normalizePartyData(importer), sameAsConsignee };
+  }
+
+  const shipment = { ...(next.shipment || {}), ...((source && source.shipment) || {}) };
+  applyPayloadValue(shipment, 'defaultOrigin', source && source.defaultOrigin);
+  applyPayloadValue(shipment, 'numPackages', source && source.numPackages, source && source.packages, source && source.packageCount);
+  applyPayloadValue(shipment, 'shippingMethod', source && source.shippingMethod);
+  applyPayloadValue(shipment, 'carrier', source && source.carrier);
+  applyPayloadValue(shipment, 'carrierContactName', source && source.carrierContactName);
+  if (shipment.defaultOrigin) shipment.defaultOrigin = String(shipment.defaultOrigin).toUpperCase();
+  next.shipment = shipment;
+
+  const totals = { ...(next.totals || {}), ...((source && source.totals) || {}) };
+  applyPayloadValue(totals, 'shippingCost', source && source.shippingCost);
+  applyPayloadValue(totals, 'insurance', source && source.insurance);
+  next.totals = totals;
+
+  const declaration = { ...(next.declaration || {}), ...((source && source.declaration) || {}) };
+  applyPayloadValue(declaration, 'name', source && source.declarantName);
+  applyPayloadValue(declaration, 'date', source && source.declarantDate);
+  next.declaration = declaration;
+
+  const rawItems = getPayloadItems(source);
+  if (rawItems !== undefined) {
+    const shouldSort = opts.sortItems === true || source.sortItems === true;
+    next.items = shouldSort ? sortItemsByDescription(rawItems) : normalizeInvoiceItems(rawItems);
+  }
+
+  return next;
+}
+
+async function loadInvoicePayload(payload, options) {
+  const opts = options || {};
+  const source = getInvoicePayloadSource(payload);
+  await ensureRepoReady();
+
+  let contactsLoaded = 0;
+  const contacts = Array.isArray(source.contacts) ? source.contacts : [];
+  if (contacts.length) {
+    const imported = await getRepo().importContacts(contacts);
+    contactsLoaded = imported.length;
+  }
+
+  let productsLoaded = 0;
+  const products = Array.isArray(source.products) ? source.products : [];
+  for (const entry of products) {
+    const product = normalizeProductEntry(entry);
+    if (!product) continue;
+    const saved = await getRepo().upsertProduct(product);
+    if (saved) productsLoaded += 1;
+  }
+
+  const nextState = mergeInvoicePayloadState(getState(), source, opts);
+  setState(nextState);
+
+  let appliedRoles = 0;
+  if (contactsLoaded && opts.applyContacts !== false && !payloadHasPartyAssignments(source)) {
+    appliedRoles = applyLoadedLocalContactsToInvoice();
+  }
+
+  saveState();
+  renderContactPickers();
+  populateProductDropdown();
+  renderProductPanel();
+
+  const itemsLoaded = getPayloadItems(source) !== undefined ? nextState.items.length : 0;
+  const message = [
+    itemsLoaded ? itemsLoaded + ' invoice line items' : '',
+    contactsLoaded ? contactsLoaded + ' contacts' : '',
+    productsLoaded ? productsLoaded + ' products' : ''
+  ].filter(Boolean).join(', ');
+  showToast(message ? 'Loaded ' + message : 'Loaded invoice data');
+
+  return {
+    contactsLoaded,
+    productsLoaded,
+    itemsLoaded,
+    appliedRoles,
+    state: getState()
+  };
+}
+
+function importInvoicePayload() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json,application/json';
+  input.addEventListener('change', async function() {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    try {
+      const payload = JSON.parse(await file.text());
+      await loadInvoicePayload(payload, { sourceName: file.name });
+    } catch (error) {
+      console.error('Invoice data import failed:', error);
+      showToast(error && error.message ? error.message : 'Could not import invoice data');
+    }
+  });
+  input.click();
+}
+
 // --- J2: PDF Download ---
-function downloadPDF() {
+function downloadPDF(options) {
+  const opts = options || {};
   // Build print block first so it has current data
   buildPrintBlock();
 
@@ -1182,10 +1441,11 @@ function downloadPDF() {
   if (typeof html2canvas === 'undefined' || typeof jspdf === 'undefined') {
     alert('PDF libraries not loaded. Please ensure lib/html2canvas.min.js and lib/jspdf.umd.min.js exist and reload.');
     document.body.removeChild(container);
-    return;
+    const error = new Error('PDF libraries are not loaded');
+    return opts.rejectOnError ? Promise.reject(error) : Promise.resolve({ filename: '', error });
   }
 
-  html2canvas(container, {
+  return html2canvas(container, {
     scale: 2,
     useCORS: true,
     logging: false,
@@ -1215,13 +1475,16 @@ function downloadPDF() {
       heightLeft -= (pageHeight - margin * 2);
     }
 
-    var filename = 'invoice' + (st.meta.invoice ? '_' + st.meta.invoice : '') + '.pdf';
-    pdf.save(filename);
+    var filename = opts.filename || ('invoice' + (st.meta.invoice ? '_' + st.meta.invoice : '') + '.pdf');
+    if (opts.save !== false) pdf.save(filename);
     document.body.removeChild(container);
+    return { filename: filename, pdf: pdf };
   }).catch(function(err) {
     console.error('PDF generation failed:', err);
     alert('PDF generation failed. Please try Print instead.');
-    document.body.removeChild(container);
+    if (container.parentNode) document.body.removeChild(container);
+    if (opts.rejectOnError) throw err;
+    return { filename: '', error: err };
   });
 }
 
@@ -1242,6 +1505,7 @@ function toggleImporterSame() {
     });
   }
   setPartyReadonly('importer', cb.checked);
+  syncImporterSameVisibility();
   saveState();
 }
 
@@ -1285,6 +1549,7 @@ function applyBlankInvoiceState() {
   const cb = $('importerSameAsConsignee');
   if (cb) cb.checked = false;
   setPartyReadonly('importer', false);
+  syncImporterSameVisibility();
 }
 
 // --- M: New Invoice ---
@@ -1329,6 +1594,7 @@ function newInvoice() {
   const cb = $('importerSameAsConsignee');
   if (cb) cb.checked = false;
   setPartyReadonly('importer', false);
+  syncImporterSameVisibility();
 
   // Default items
   addRow({ qty: 2, desc: 'Ray-Ban Meta Sunglasses', hs: '9004.10.3', unit: 299, sku: '', uom: 'pcs', origin: 'US', weight: 0.05 });
@@ -1441,7 +1707,26 @@ function applyVisibility() {
     }
   });
 
+  updateItemGridColumns();
   saveSettings();
+}
+
+function updateItemGridColumns() {
+  const hiddenColumns = new Set();
+  Object.keys(VISIBILITY_MAP).forEach(togId => {
+    const map = VISIBILITY_MAP[togId];
+    if (!map || map.col === undefined) return;
+    const el = $(togId);
+    if (el && !el.checked) hiddenColumns.add(map.col);
+  });
+
+  const template = ITEM_GRID_COLUMNS
+    .filter((_, index) => !hiddenColumns.has(index))
+    .join(' ');
+
+  document.querySelectorAll('.gridCols').forEach(grid => {
+    grid.style.gridTemplateColumns = template;
+  });
 }
 
 // --- O: Address Book ---
@@ -2405,5 +2690,16 @@ function init() {
   const repoReady = ensureRepoReady();
   return repoReady;
 }
+
+window.InvoiceGeneratorTools = {
+  loadPayload: loadInvoicePayload,
+  importPayload: importInvoicePayload,
+  sortItemsByDescription: sortInvoiceItemsByDescription,
+  saveCurrentInvoice,
+  downloadPDF,
+  getState,
+  setState,
+  getRepo
+};
 
 window.__appReadyPromise = init();

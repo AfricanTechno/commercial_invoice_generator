@@ -14,10 +14,13 @@
       <strong>Invoice Generator</strong>
       <div class="actions">
         <button class="btn" onclick="printInvoice()">Print</button>
-        <button class="btn" onclick="downloadPDF()">PDF</button>
+        <button class="btn" onclick="downloadPDF().catch(function(){})">PDF</button>
         <button class="btn" onclick="newInvoice()">New Invoice</button>
+        <button class="btn" onclick="saveCurrentInvoice()">Save Invoice</button>
         <button class="btn" onclick="exportCSV()">Export CSV</button>
         <button class="btn" onclick="exportJSON()">Export JSON</button>
+        <button class="btn" onclick="importInvoicePayload()">Import Data</button>
+        <button class="btn" onclick="sortInvoiceItemsByDescription()">Sort A-Z</button>
         <a class="btn nav-btn" href="library.html">Library</a>
         <div class="history-wrap">
           <button class="btn" onclick="toggleHistoryPanel()">History</button>
@@ -48,6 +51,7 @@
         <label class="toggle-row"><input type="checkbox" id="togReasonForExport" onchange="applyVisibility()" /> Reason for Export</label>
         <label class="toggle-row"><input type="checkbox" id="togImporter" onchange="applyVisibility()" /> Importer of Record</label>
         <label class="toggle-row"><input type="checkbox" id="togShipmentDetails" checked onchange="applyVisibility()" /> Shipment Details</label>
+        <label class="toggle-row"><input type="checkbox" id="togLineNumber" checked onchange="applyVisibility()" /> Line Item Number Column</label>
         <label class="toggle-row"><input type="checkbox" id="togUom" checked onchange="applyVisibility()" /> Unit of Measure Column</label>
         <label class="toggle-row"><input type="checkbox" id="togOrigin" onchange="applyVisibility()" /> Country of Origin Column</label>
         <label class="toggle-row"><input type="checkbox" id="togWeight" onchange="applyVisibility()" /> Weight Column</label>
@@ -240,20 +244,22 @@
             <select class="contact-picker" id="importerPicker" onchange="pickContact(this, 'importer')"><option value="">Load contact...</option></select>
             <label class="same-check"><input type="checkbox" id="importerSameAsConsignee" onclick="toggleImporterSame()" /> Same as Consignee</label>
           </h3>
-          <label class="field"><span class="label">Company / Name</span><input id="importerName" /></label>
-          <div class="address-fields">
-            <label class="field"><span class="label">Address 1</span><input id="importerAddress1" /></label>
-            <label class="field"><span class="label">Address 2</span><input id="importerAddress2" /></label>
-            <label class="field"><span class="label">City</span><input id="importerCity" /></label>
-            <label class="field"><span class="label">State / Province</span><input id="importerStateProvince" /></label>
-            <label class="field"><span class="label">Postal / ZIP Code</span><input id="importerPostalCode" /></label>
-            <label class="field"><span class="label">Country</span><select id="importerCountry" class="country-select"></select></label>
+          <div id="importerFields">
+            <label class="field"><span class="label">Company / Name</span><input id="importerName" /></label>
+            <div class="address-fields">
+              <label class="field"><span class="label">Address 1</span><input id="importerAddress1" /></label>
+              <label class="field"><span class="label">Address 2</span><input id="importerAddress2" /></label>
+              <label class="field"><span class="label">City</span><input id="importerCity" /></label>
+              <label class="field"><span class="label">State / Province</span><input id="importerStateProvince" /></label>
+              <label class="field"><span class="label">Postal / ZIP Code</span><input id="importerPostalCode" /></label>
+              <label class="field"><span class="label">Country</span><select id="importerCountry" class="country-select"></select></label>
+            </div>
+            <div class="party-row">
+              <label class="field"><span class="label">Phone</span><input id="importerPhone" /></label>
+              <label class="field"><span class="label">Email</span><input id="importerEmail" /></label>
+            </div>
+            <label class="field"><span class="label">Tax / VAT Number / Importer Code / ID Number</span><input id="importerTaxId" /></label>
           </div>
-          <div class="party-row">
-            <label class="field"><span class="label">Phone</span><input id="importerPhone" /></label>
-            <label class="field"><span class="label">Email</span><input id="importerEmail" /></label>
-          </div>
-          <label class="field"><span class="label">Tax / VAT Number / Importer Code / ID Number</span><input id="importerTaxId" /></label>
         </div>
       </div>
 
@@ -344,6 +350,6 @@
   <script src="js/catalogue.js?v=5.3"></script>
   <script src="js/app-config.js?v=6.3"></script>
   <script src="js/address-book-service.js?v=6.9"></script>
-  <script src="js/invoice.js?v=6.10"></script>
+  <script src="js/invoice.js?v=6.18"></script>
 </body>
 </html>
