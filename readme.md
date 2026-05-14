@@ -209,6 +209,21 @@ The print layout (Cmd/Ctrl+P) and PDF download both produce a clean A4 document 
 
 All interactive form elements (dropdowns, inputs, checkboxes) are hidden in print — only clean text renders. The PDF button uses html2canvas + jsPDF bundled locally in `lib/` — no server or internet required, works on mobile and `file://`.
 
+### Headless PDF Export Note
+
+When generating a PDF from the command line with Chrome or Chromium, include both header/footer suppression flags. Different Chromium builds honor different flag names, and using both avoids the browser-added date/title/URL/page footer being added to the invoice:
+
+```bash
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
+  --headless=new \
+  --no-pdf-header-footer \
+  --print-to-pdf-no-header \
+  --print-to-pdf="exports/commercial-invoice.pdf" \
+  "file://$PWD/exports/commercial-invoice.html"
+```
+
+If the headless browser writes the PDF but does not exit cleanly, keep the generated file and stop only the temporary browser process.
+
 ## Storage & Migration
 
 - Invoice drafts still use `localStorage` key `invoice_v4`. The app automatically migrates older invoice keys (`invoice_v3`, `invoice_pro_state_v2_no_vat`, `invoice_state`).
