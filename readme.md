@@ -224,6 +224,14 @@ When generating a PDF from the command line with Chrome or Chromium, include bot
 
 If the headless browser writes the PDF but does not exit cleanly, keep the generated file and stop only the temporary browser process.
 
+### Codex Skill
+
+A local Codex skill is installed at `~/.codex/skills/commercial-invoice-generator` for repeat invoice-generation work in this repo.
+
+Use `$commercial-invoice-generator` in a new Codex session when updating private invoice seed data, aligning the app preview, generating a clean commercial invoice PDF, or validating the exported artifact. The skill records the private `local-data/*.local.json` workflow, the ignored `exports/` artifact location, the headless Chrome header/footer flags above, and PDF text validation helpers.
+
+Codex only loads newly installed skills when a session starts, so a session that was already running before the skill was installed will not see it until a new session is opened.
+
 ## Storage & Migration
 
 - Invoice drafts still use `localStorage` key `invoice_v4`. The app automatically migrates older invoice keys (`invoice_v3`, `invoice_pro_state_v2_no_vat`, `invoice_state`).
